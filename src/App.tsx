@@ -256,13 +256,14 @@ export default function App() {
     instalarCssResponsivo();
     carregarDados(false);
 
-    // Subscrição em Tempo Real (Realtime) com atualização instantânea do estado
+    // Subscrição em Tempo Real com atualização imediata de estado e monitorização por log
     const canal = supabase
       .channel('controlmaq-sync-realtime')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'chamados' },
         (payload) => {
+          console.log('[REALTIME] Chamado inserido:', payload);
           const novoChamado = payload.new as Chamado;
           setChamados((prev) => {
             if (prev.some((c) => c.id === novoChamado.id)) return prev;
@@ -274,6 +275,7 @@ export default function App() {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'chamados' },
         (payload) => {
+          console.log('[REALTIME] Chamado atualizado:', payload);
           const chamadoAtualizado = payload.new as Chamado;
           setChamados((prev) =>
             prev.map((c) => (c.id === chamadoAtualizado.id ? chamadoAtualizado : c))
@@ -284,6 +286,7 @@ export default function App() {
         'postgres_changes',
         { event: 'DELETE', schema: 'public', table: 'chamados' },
         (payload) => {
+          console.log('[REALTIME] Chamado excluído:', payload);
           const idExcluido = (payload.old as { id: number }).id;
           setChamados((prev) => prev.filter((c) => c.id !== idExcluido));
         }
@@ -308,7 +311,9 @@ export default function App() {
         { event: '*', schema: 'public', table: 'historico_preventivas' },
         () => carregarDados(false)
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[REALTIME] Status da conexão:', status);
+      });
 
     return () => {
       supabase.removeChannel(canal);
