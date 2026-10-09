@@ -41,28 +41,40 @@ import {
 import { DashboardExecutivo } from './screens/DashboardExecutivo';
 import { executarAcaoDashboard } from './utils/dashboardNavegacao';
 
-function tocarAlertaSonoroEVibrar() {
+// Som de alerta automotivo/industrial (Beep duplo audível)
+const SOM_ALERTA_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
+
+function dispararAlertaMecanico(chamado: Chamado) {
+  // 1. Vibração intensa em pulso contínuo
   try {
     if (typeof window !== 'undefined' && 'navigator' in window && navigator.vibrate) {
-      navigator.vibrate([200, 100, 200, 100, 300]);
-    }
-    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (AudioContextClass) {
-      const ctx = new AudioContextClass();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(880, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.3);
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.3);
+      navigator.vibrate([400, 200, 400, 200, 800]);
     }
   } catch {
-    // Audio context bloqueado antes do primeiro clique
+    // Silencia se não suportado
+  }
+
+  // 2. Som nítido via elemento Audio
+  try {
+    const audio = new Audio(SOM_ALERTA_URL);
+    audio.volume = 1.0;
+    audio.play().catch(() => {
+      // Ignora bloqueio caso o utilizador ainda não tenha tocado no ecrã
+    });
+  } catch {
+    // Silencia erro de reprodução
+  }
+
+  // 3. Notificação nativa do sistema operacional (Android / PC)
+  try {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(`🚨 Nova O.S. #${chamado.id} - ${chamado.maquina}`, {
+        body: `Local: ${chamado.local}\nProblema: ${chamado.problema}`,
+        icon: '/favicon.ico',
+      });
+    }
+  } catch {
+    // Silencia se não suportado
   }
 }
 
@@ -117,6 +129,9 @@ export default function App() {
     return 'login';
   });
 
+  // Banner Flutuante de Alerta Imediato para Mecânico
+  const [chamadoAlertaEntrante, setChamadoAlertaEntrante] = useState<Chamado | null>(null);
+
   const [modoVisualizacao, setModoVisualizacao] = useState<'lista' | 'kanban'>('lista');
   const [filtroChamados, setFiltroChamados] = useState<FiltroChamado>('Todos');
   const [buscaChamados, setBuscaChamados] = useState('');
@@ -152,7 +167,6 @@ export default function App() {
   const [litrosOleoHidraulico, setLitrosOleoHidraulico] = useState('');
   const [litrosOleoMotor, setLitrosOleoMotor] = useState('');
 
-  // Foto em Base64 para Chamados
   const [fotoNovoChamado, setFotoNovoChamado] = useState<string>('');
   const [chamadoParaFinalizar, setChamadoParaFinalizar] = useState<Chamado | null>(null);
   const [fotoFinalizacao, setFotoFinalizacao] = useState<string>('');
@@ -178,7 +192,16 @@ export default function App() {
   const isAdmin = usuarioLogado?.tipo === 'admin';
   const isMecanico = usuarioLogado?.tipo === 'mecanico';
 
-  // Cálculos de Indicadores de Manutenção (MTTR e Disponibilidade)
+  // Pedir permissão de notificações nativas assim que logar
+  useEffect(() => {
+    if (usuarioLogado && typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    }
+  }, [usuarioLogado]);
+
+  // Indicadores de Manutenção
   const chamadosConcluidosComTempo = chamados.filter(
     (c) => c.status === 'Finalizado' && c.iniciado_at && c.finalizado_at
   );
@@ -198,7 +221,6 @@ export default function App() {
     ? Math.round((maquinasOperacionais / totalMaquinas) * 100)
     : 100;
 
-  // Preventivas com menos de 25h ou vencidas
   const preventivasCriticas = preventivas.filter(
     (p) => p.status_preventiva === 'Urgente' || p.status_preventiva === 'Vencida'
   );
@@ -306,9 +328,11 @@ export default function App() {
             if (prev.some((c) => c.id === novo.id)) return prev;
             return [novo, ...prev];
           });
-          // Dispara alerta sonoro e vibração se o chamado for designado a este utilizador
+
+          // Se for mecânico e o chamado for para ele, dispara o alarme audiovisual
           if (usuarioLogado && compararNomes(novo.mecanico, usuarioLogado.nome)) {
-            tocarAlertaSonoroEVibrar();
+            dispararAlertaMecanico(novo);
+            setChamadoAlertaEntrante(novo);
           }
         }
       )
@@ -337,7 +361,7 @@ export default function App() {
         const { data } = await supabase.from('chamados').select('*').order('id', { ascending: false });
         if (data) setChamados(data as Chamado[]);
       } catch {
-        // Ignora erros transitórios de rede
+        // Ignora falhas temporárias
       }
     }, 4000);
 
@@ -498,6 +522,18 @@ export default function App() {
         background: #fff1f2; border: 1px solid #fecdd3; border-radius: 10px;
         padding: 12px 16px; margin-bottom: 16px; display: flex;
         justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
+      }
+      .banner-alerta-os {
+        position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+        width: 92%; max-width: 500px; z-index: 1000;
+        background: #ef4444; color: #fff; padding: 14px 18px;
+        border-radius: 12px; box-shadow: 0 10px 25px rgba(239, 68, 68, 0.4);
+        display: flex; justify-content: space-between; align-items: center;
+        animation: pulseAlert 1.5s infinite;
+      }
+      @keyframes pulseAlert {
+        0%, 100% { transform: translateX(-50%) scale(1); }
+        50% { transform: translateX(-50%) scale(1.02); }
       }
       .checkbox-item {
         display: flex; align-items: center; gap: 8px; background: #f8fafc;
@@ -720,50 +756,6 @@ export default function App() {
               </tbody>
             </table>
           `}
-          <script>window.onload = function() { window.print(); };</script>
-        </body>
-      </html>
-    `);
-    janela.document.close();
-  }
-
-  function gerarPdfPreventiva(
-    maquina: { tag: string; marca: string; modelo: string },
-    revisao: {
-      horimetro_preventiva: number;
-      mecanico_responsavel: string;
-      observacao: string;
-      created_at: string;
-    }
-  ) {
-    const janela = window.open('', '_blank');
-    if (!janela) {
-      alert('Permita janelas pop-up no navegador.');
-      return;
-    }
-
-    janela.document.open();
-    janela.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Ficha Preventiva - ${maquina.tag}</title>
-          <meta charset="UTF-8" />
-          <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 15mm; }
-            .box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 12px; font-size: 12px; }
-          </style>
-        </head>
-        <body>
-          <h2>LOKMAX — Relatório de Revisão Preventiva</h2>
-          <div class="box">
-            <div>Equipamento: <strong>${maquina.tag}</strong> (${maquina.marca} ${maquina.modelo})</div>
-            <div>Horímetro: <strong>${revisao.horimetro_preventiva} h</strong></div>
-            <div>Data: <strong>${new Date(revisao.created_at).toLocaleString('pt-BR')}</strong></div>
-            <div>Mecânico: <strong>${revisao.mecanico_responsavel}</strong></div>
-          </div>
-          <h4>Itens Executados e Insumos</h4>
-          <div class="box">${revisao.observacao.replace(/\n/g, '<br/>')}</div>
           <script>window.onload = function() { window.print(); };</script>
         </body>
       </html>
@@ -1251,6 +1243,37 @@ export default function App() {
 
   return (
     <div style={estilos.pagina}>
+      {/* BANNER FLUTUANTE DE CHAMADA ENTRANTE (MECÂNICO) */}
+      {chamadoAlertaEntrante && (
+        <div className="banner-alerta-os">
+          <div>
+            <div style={{ fontWeight: 900, fontSize: '14px' }}>🚨 NOVA O.S. RECEBIDA!</div>
+            <div style={{ fontSize: '12px' }}>
+              <strong>{chamadoAlertaEntrante.maquina}</strong> — {chamadoAlertaEntrante.local}
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setChamadoDetalhes(chamadoAlertaEntrante);
+              setTela('detalhesChamado');
+              setChamadoAlertaEntrante(null);
+            }}
+            style={{
+              background: '#fff',
+              color: '#dc2626',
+              border: 0,
+              padding: '8px 12px',
+              borderRadius: '8px',
+              fontWeight: 800,
+              cursor: 'pointer',
+              fontSize: '12px',
+            }}
+          >
+            Abrir
+          </button>
+        </div>
+      )}
+
       <Topo
         usuario={usuarioLogado}
         tela={tela}
