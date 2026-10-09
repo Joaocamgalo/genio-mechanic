@@ -41,11 +41,41 @@ import {
 import { DashboardExecutivo } from './screens/DashboardExecutivo';
 import { executarAcaoDashboard } from './utils/dashboardNavegacao';
 
+function tocarAlertaSonoroEVibrar() {
+  try {
+    if (typeof window !== 'undefined' && 'navigator' in window && navigator.vibrate) {
+      navigator.vibrate([200, 100, 200, 100, 300]);
+    }
+    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (AudioContextClass) {
+      const ctx = new AudioContextClass();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.3);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.3);
+    }
+  } catch {
+    // Audio context bloqueado antes do primeiro clique
+  }
+}
+
+function compararNomes(a?: string | null, b?: string | null) {
+  if (!a || !b) return false;
+  const limpoA = a.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+  const limpoB = b.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+  return limpoA === limpoB;
+}
+
 export default function App() {
   const [isMobile, setIsMobile] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return window.innerWidth <= 900;
-    }
+    if (typeof window !== 'undefined') return window.innerWidth <= 900;
     return false;
   });
 
@@ -62,9 +92,7 @@ export default function App() {
       const salvo = localStorage.getItem(CHAVE_USUARIO_LOGADO);
       if (salvo) {
         const u = JSON.parse(salvo) as Usuario;
-        if (u?.id && u?.login && u?.tipo) {
-          return u;
-        }
+        if (u?.id && u?.login && u?.tipo) return u;
       }
     } catch {
       // Ignora erro
@@ -89,7 +117,6 @@ export default function App() {
     return 'login';
   });
 
-  // Filtros e Visualização de Chamados
   const [modoVisualizacao, setModoVisualizacao] = useState<'lista' | 'kanban'>('lista');
   const [filtroChamados, setFiltroChamados] = useState<FiltroChamado>('Todos');
   const [buscaChamados, setBuscaChamados] = useState('');
@@ -97,29 +124,21 @@ export default function App() {
   const [filtroMaquinaChamados, setFiltroMaquinaChamados] = useState('');
   const [filtroMecanicoChamados, setFiltroMecanicoChamados] = useState('');
 
-  // Filtros e Gestão de Máquinas
   const [filtroStatusMaquina, setFiltroStatusMaquina] = useState<'Todos' | 'Operacional' | 'Parada' | 'Em manutenção'>('Todos');
   const [buscaMaquinas, setBuscaMaquinas] = useState('');
   const [modalNovaMaquina, setModalNovaMaquina] = useState(false);
   const [maquinaEmEdicao, setMaquinaEmEdicao] = useState<Maquina | null>(null);
   const [maquinaDossie, setMaquinaDossie] = useState<Maquina | null>(null);
 
-  // Apontamento de Horímetro em Lote
   const [leiturasLote, setLeiturasLote] = useState<Record<string, string>>({});
-
-  // Filtros de Utilizadores
   const [buscaUsuarios, setBuscaUsuarios] = useState('');
-
-  // Filtros de Preventivas
   const [filtroPreventivas, setFiltroPreventivas] = useState<FiltroPreventiva>('Todos');
   const [buscaPreventivas, setBuscaPreventivas] = useState('');
   const [preventivaSelecionada, setPreventivaSelecionada] = useState<PreventivaMaquina | null>(null);
   const [modoPreventiva, setModoPreventiva] = useState<'configurar' | 'registrar' | null>(null);
 
-  // Modal de Histórico Técnico da Máquina
   const [maquinaHistoricoModal, setMaquinaHistoricoModal] = useState<PreventivaMaquina | null>(null);
 
-  // Estados dos Checkboxes de Revisão Preventiva
   const [itensRevisao, setItensRevisao] = useState({
     filtroCombustivel: false,
     filtroCombustivelSeparador: false,
@@ -133,8 +152,10 @@ export default function App() {
   const [litrosOleoHidraulico, setLitrosOleoHidraulico] = useState('');
   const [litrosOleoMotor, setLitrosOleoMotor] = useState('');
 
-  // Finalização e Assinatura Digital de Chamados
+  // Foto em Base64 para Chamados
+  const [fotoNovoChamado, setFotoNovoChamado] = useState<string>('');
   const [chamadoParaFinalizar, setChamadoParaFinalizar] = useState<Chamado | null>(null);
+  const [fotoFinalizacao, setFotoFinalizacao] = useState<string>('');
   const [assinaturaDataUrl, setAssinaturaDataUrl] = useState<string>('');
   const [chamadoDetalhes, setChamadoDetalhes] = useState<Chamado | null>(null);
 
@@ -157,12 +178,30 @@ export default function App() {
   const isAdmin = usuarioLogado?.tipo === 'admin';
   const isMecanico = usuarioLogado?.tipo === 'mecanico';
 
-  function compararNomes(a?: string | null, b?: string | null) {
-    if (!a || !b) return false;
-    const limpoA = a.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
-    const limpoB = b.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
-    return limpoA === limpoB;
-  }
+  // Cálculos de Indicadores de Manutenção (MTTR e Disponibilidade)
+  const chamadosConcluidosComTempo = chamados.filter(
+    (c) => c.status === 'Finalizado' && c.iniciado_at && c.finalizado_at
+  );
+  const totalMinutosAtendimento = chamadosConcluidosComTempo.reduce((acc, c) => {
+    const diff = new Date(c.finalizado_at!).getTime() - new Date(c.iniciado_at!).getTime();
+    return acc + Math.max(0, diff / (1000 * 60));
+  }, 0);
+  const mttrHoras = chamadosConcluidosComTempo.length > 0
+    ? (totalMinutosAtendimento / chamadosConcluidosComTempo.length / 60).toFixed(1)
+    : '0.0';
+
+  const totalMaquinas = maquinas.length;
+  const maquinasOperacionais = maquinas.filter(
+    (m) => calcularSituacaoMaquina(m.tag, chamados) === 'Operacional'
+  ).length;
+  const taxaDisponibilidade = totalMaquinas > 0
+    ? Math.round((maquinasOperacionais / totalMaquinas) * 100)
+    : 100;
+
+  // Preventivas com menos de 25h ou vencidas
+  const preventivasCriticas = preventivas.filter(
+    (p) => p.status_preventiva === 'Urgente' || p.status_preventiva === 'Vencida'
+  );
 
   const chamadosVisiveis = isAdmin
     ? chamados
@@ -223,12 +262,8 @@ export default function App() {
     if (filtroStatusMaquina === 'Todos') return true;
 
     const situacaoCalculada = calcularSituacaoMaquina(m.tag, chamados);
-    if (filtroStatusMaquina === 'Em manutenção') {
-      return situacaoCalculada === 'Em manutenção';
-    }
-    if (filtroStatusMaquina === 'Parada') {
-      return m.status_maquina === 'Parada' || situacaoCalculada === 'Parada';
-    }
+    if (filtroStatusMaquina === 'Em manutenção') return situacaoCalculada === 'Em manutenção';
+    if (filtroStatusMaquina === 'Parada') return m.status_maquina === 'Parada' || situacaoCalculada === 'Parada';
     return m.status_maquina === 'Operacional' && situacaoCalculada === 'Operacional';
   });
 
@@ -259,7 +294,6 @@ export default function App() {
     instalarCssResponsivo();
     carregarDados(false);
 
-    // 1. Ouvinte Realtime com canal único por sessão
     const canalId = `canal_${Math.random().toString(36).substring(7)}`;
     const canal = supabase
       .channel(canalId)
@@ -267,19 +301,21 @@ export default function App() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'chamados' },
         (payload) => {
-          console.log('[REALTIME INSERT]', payload);
           const novo = payload.new as Chamado;
           setChamados((prev) => {
             if (prev.some((c) => c.id === novo.id)) return prev;
             return [novo, ...prev];
           });
+          // Dispara alerta sonoro e vibração se o chamado for designado a este utilizador
+          if (usuarioLogado && compararNomes(novo.mecanico, usuarioLogado.nome)) {
+            tocarAlertaSonoroEVibrar();
+          }
         }
       )
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'chamados' },
         (payload) => {
-          console.log('[REALTIME UPDATE]', payload);
           const atualizado = payload.new as Chamado;
           setChamados((prev) =>
             prev.map((c) => (c.id === atualizado.id ? atualizado : c))
@@ -294,19 +330,14 @@ export default function App() {
           setChamados((prev) => prev.filter((c) => c.id !== idExcluido));
         }
       )
-      .subscribe((status) => {
-        console.log('[REALTIME STATUS]', status);
-      });
+      .subscribe();
 
-    // 2. Polling inteligente de segurança a cada 4 segundos (garante sync mesmo com 4G oscilando)
     const intervaloPolling = setInterval(async () => {
       try {
         const { data } = await supabase.from('chamados').select('*').order('id', { ascending: false });
-        if (data) {
-          setChamados(data as Chamado[]);
-        }
+        if (data) setChamados(data as Chamado[]);
       } catch {
-        // Ignora silenciosamente erros de oscilação transitória
+        // Ignora erros transitórios de rede
       }
     }, 4000);
 
@@ -314,7 +345,7 @@ export default function App() {
       supabase.removeChannel(canal);
       clearInterval(intervaloPolling);
     };
-  }, []);
+  }, [usuarioLogado]);
 
   useEffect(() => {
     return subscribeConnectivity((estaOnline) => {
@@ -370,17 +401,39 @@ export default function App() {
       if (operacoesRes.status === 'fulfilled' && !operacoesRes.value.error) {
         setOperacoesDiarias((operacoesRes.value.data || []) as OperacaoDiaria[]);
       }
-      if (prevData.status === 'fulfilled') {
-        setPreventivas(prevData.value);
-      }
-      if (histPrevData.status === 'fulfilled') {
-        setHistoricoPreventivas(histPrevData.value);
-      }
+      if (prevData.status === 'fulfilled') setPreventivas(prevData.value);
+      if (histPrevData.status === 'fulfilled') setHistoricoPreventivas(histPrevData.value);
 
       setUltimaSincronizacao(new Date());
     } finally {
       if (mostrarCarregando) setCarregando(false);
     }
+  }
+
+  function converterImagemParaBase64(e: React.ChangeEvent<HTMLInputElement>, setFoto: (b64: string) => void) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 800;
+        let width = img.width;
+        let height = img.height;
+        if (width > MAX_WIDTH) {
+          height = Math.round((height * MAX_WIDTH) / width);
+          width = MAX_WIDTH;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        setFoto(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   }
 
   function resetarCamposRevisao() {
@@ -417,117 +470,68 @@ export default function App() {
       }
       * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
       html, body {
-        margin: 0;
-        padding: 0;
-        width: 100%;
-        min-height: 100%;
-        background: var(--cm-bg);
-        color: #0f172a;
+        margin: 0; padding: 0; width: 100%; min-height: 100%;
+        background: var(--cm-bg); color: #0f172a;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         overflow-x: hidden;
       }
-      
       .cm-card {
-        background: #ffffff;
-        border: 1px solid var(--cm-border);
-        border-radius: 12px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        background: #ffffff; border: 1px solid var(--cm-border);
+        border-radius: 12px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
         word-break: break-word;
       }
-
       .cm-badge {
-        padding: 4px 8px;
-        border-radius: 20px;
-        font-size: 11px;
-        font-weight: 700;
-        display: inline-flex;
-        align-items: center;
-        white-space: nowrap;
+        padding: 4px 8px; border-radius: 20px; font-size: 11px;
+        font-weight: 700; display: inline-flex; align-items: center; white-space: nowrap;
       }
       .badge-aberto { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; }
       .badge-assumido { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
       .badge-finalizado { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
-      
       .badge-op-operacional { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
       .badge-op-parada { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
       .badge-op-manutencao { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
-
-      .badge-prev-em-dia { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
-      .badge-prev-atencao { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
-      .badge-prev-urgente { background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
-      .badge-prev-vencida { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
-      .badge-prev-pendente { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
-
-      .checkbox-item {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        padding: 10px;
-        border-radius: 8px;
-        font-size: 13px;
-        font-weight: 600;
-        color: #334155;
-        user-select: none;
+      .kpi-card {
+        background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+        padding: 12px 14px; display: flex; flex-direction: column; justify-content: space-between;
       }
-
+      .alerta-preventiva {
+        background: #fff1f2; border: 1px solid #fecdd3; border-radius: 10px;
+        padding: 12px 16px; margin-bottom: 16px; display: flex;
+        justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
+      }
+      .checkbox-item {
+        display: flex; align-items: center; gap: 8px; background: #f8fafc;
+        border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px;
+        font-size: 13px; font-weight: 600; color: #334155; user-select: none;
+      }
       .timeline-container {
-        border-left: 2px solid #e2e8f0;
-        padding-left: 14px;
-        margin-left: 6px;
-        display: grid;
-        gap: 14px;
+        border-left: 2px solid #e2e8f0; padding-left: 14px; margin-left: 6px;
+        display: grid; gap: 14px;
       }
       .timeline-entry {
-        position: relative;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-        padding: 12px;
+        position: relative; background: #f8fafc; border: 1px solid #e2e8f0;
+        border-radius: 10px; padding: 12px;
       }
       .timeline-dot {
-        position: absolute;
-        left: -21px;
-        top: 14px;
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        background: #f59e0b;
-        border: 2px solid #ffffff;
+        position: absolute; left: -21px; top: 14px; width: 12px; height: 12px;
+        border-radius: 50%; background: #f59e0b; border: 2px solid #ffffff;
       }
-
       .kanban-grid {
-        display: flex;
-        gap: 14px;
-        overflow-x: auto;
-        padding-bottom: 16px;
+        display: flex; gap: 14px; overflow-x: auto; padding-bottom: 16px;
         -webkit-overflow-scrolling: touch;
       }
       .kanban-coluna {
-        flex: 0 0 310px;
-        background: #f1f5f9;
-        border-radius: 12px;
-        padding: 12px;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        min-height: 400px;
+        flex: 0 0 310px; background: #f1f5f9; border-radius: 12px;
+        padding: 12px; display: flex; flex-direction: column; gap: 10px; min-height: 400px;
       }
-
       @media (max-width: 900px) {
         .controlmaq-desktop-sidebar {
-          transform: translateX(-100%) !important;
-          transition: transform 0.25s ease-in-out !important;
-          width: 270px !important;
+          transform: translateX(-100%) !important; transition: transform 0.25s ease-in-out !important; width: 270px !important;
         }
         .controlmaq-sidebar-open {
-          transform: translateX(0) !important;
-          box-shadow: 0 0 40px rgba(0, 0, 0, 0.7) !important;
+          transform: translateX(0) !important; box-shadow: 0 0 40px rgba(0, 0, 0, 0.7) !important;
         }
-        .kanban-coluna {
-          flex: 0 0 85vw !important;
-        }
+        .kanban-coluna { flex: 0 0 85vw !important; }
       }
     `;
   }
@@ -557,6 +561,8 @@ export default function App() {
     const dataAbertura = chamado.created_at ? new Date(chamado.created_at).toLocaleString('pt-BR') : 'Não informado';
     const dataConclusao = chamado.finalizado_at ? new Date(chamado.finalizado_at).toLocaleString('pt-BR') : 'Em andamento';
     const assinaturaSalva = localStorage.getItem(`controlmaq_assinatura_${chamado.id}`) || '';
+    const fotoAberturaSalva = localStorage.getItem(`controlmaq_foto_${chamado.id}`) || '';
+    const fotoFinalizacaoSalva = localStorage.getItem(`controlmaq_foto_fim_${chamado.id}`) || '';
 
     let downtimeTexto = 'Em atendimento';
     if (chamado.created_at && chamado.finalizado_at) {
@@ -576,13 +582,15 @@ export default function App() {
           <meta name="viewport" content="width=device-width, initial-scale=1.0" />
           <style>
             * { box-sizing: border-box; }
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; color: #0f172a; background: #fff; padding: 15mm; }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; color: #0f172a; padding: 15mm; }
             .cabecalho { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 16px; }
             .bloco-dados { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
             .dado-item small { display: block; font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase; }
             .dado-item strong { font-size: 13px; color: #0f172a; }
             .secao-titulo { font-size: 12px; font-weight: 800; text-transform: uppercase; color: #0f172a; border-left: 4px solid #f59e0b; padding-left: 8px; margin: 14px 0 6px; }
             .conteudo-caixa { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; font-size: 12px; line-height: 1.5; background: #ffffff; }
+            .fotos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+            .foto-img { max-height: 180px; width: 100%; object-fit: contain; border: 1px solid #cbd5e1; border-radius: 6px; }
             .assinaturas { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 30px; }
             .linha-assinatura { border-top: 1px solid #94a3b8; text-align: center; padding-top: 6px; font-size: 11px; }
             .box-assinatura-digital { height: 60px; display: flex; align-items: flex-end; justify-content: center; margin-bottom: 4px; }
@@ -620,6 +628,14 @@ export default function App() {
 
           <div class="secao-titulo">Serviço & Insumos Utilizados</div>
           <div class="conteudo-caixa">${chamado.solucao || 'Serviço em execução.'}</div>
+
+          ${(fotoAberturaSalva || fotoFinalizacaoSalva) ? `
+            <div class="secao-titulo">Evidências Fotográficas</div>
+            <div class="fotos-grid">
+              ${fotoAberturaSalva ? `<div><small style="display:block;margin-bottom:4px;font-weight:700;">Antes / Anomalia</small><img src="${fotoAberturaSalva}" class="foto-img" /></div>` : ''}
+              ${fotoFinalizacaoSalva ? `<div><small style="display:block;margin-bottom:4px;font-weight:700;">Depois / Conclusão</small><img src="${fotoFinalizacaoSalva}" class="foto-img" /></div>` : ''}
+            </div>
+          ` : ''}
 
           <div class="assinaturas">
             <div>
@@ -659,9 +675,7 @@ export default function App() {
         <head>
           <title>Dossiê - ${m.tag}</title>
           <meta charset="UTF-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
           <style>
-            * { box-sizing: border-box; }
             body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; color: #0f172a; padding: 15mm; }
             table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 8px; }
             th { background: #0f172a; color: #fff; text-align: left; padding: 6px 8px; }
@@ -669,13 +683,11 @@ export default function App() {
           </style>
         </head>
         <body>
-          <div style="border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 14px;">
-            <h2 style="margin: 0; font-size: 18px;">LOKMAX — Dossiê do Ativo</h2>
-            <div style="font-size: 12px; color: #64748b;">TAG: <strong>${m.tag}</strong> (${m.marca} ${m.modelo}) | Horímetro: <strong>${m.horimetro ?? 0} h</strong></div>
-          </div>
+          <h2>LOKMAX — Dossiê do Ativo</h2>
+          <div style="font-size: 12px; color: #64748b; margin-bottom: 14px;">TAG: <strong>${m.tag}</strong> (${m.marca} ${m.modelo}) | Horímetro: <strong>${m.horimetro ?? 0} h</strong></div>
 
-          <h3 style="font-size: 13px; text-transform: uppercase;">Preventivas (${revisoesDaMaquina.length})</h3>
-          ${revisoesDaMaquina.length === 0 ? '<p style="font-size: 11px; color: #64748b;">Nenhuma preventiva registada.</p>' : `
+          <h3>Preventivas (${revisoesDaMaquina.length})</h3>
+          ${revisoesDaMaquina.length === 0 ? '<p>Nenhuma preventiva registada.</p>' : `
             <table>
               <thead><tr><th>Data</th><th>Horímetro</th><th>Responsável</th><th>Descrição</th></tr></thead>
               <tbody>
@@ -691,8 +703,8 @@ export default function App() {
             </table>
           `}
 
-          <h3 style="font-size: 13px; text-transform: uppercase; margin-top: 20px;">Ordens de Serviço (${chamadosDaMaquina.length})</h3>
-          ${chamadosDaMaquina.length === 0 ? '<p style="font-size: 11px; color: #64748b;">Nenhum chamado registado.</p>' : `
+          <h3 style="margin-top: 20px;">Ordens de Serviço (${chamadosDaMaquina.length})</h3>
+          ${chamadosDaMaquina.length === 0 ? '<p>Nenhum chamado registado.</p>' : `
             <table>
               <thead><tr><th>OS #</th><th>Status</th><th>Data</th><th>Problema</th><th>Solução</th></tr></thead>
               <tbody>
@@ -746,7 +758,7 @@ export default function App() {
           <h2>LOKMAX — Relatório de Revisão Preventiva</h2>
           <div class="box">
             <div>Equipamento: <strong>${maquina.tag}</strong> (${maquina.marca} ${maquina.modelo})</div>
-            <div>Horímetro da Revisão: <strong>${revisao.horimetro_preventiva} h</strong></div>
+            <div>Horímetro: <strong>${revisao.horimetro_preventiva} h</strong></div>
             <div>Data: <strong>${new Date(revisao.created_at).toLocaleString('pt-BR')}</strong></div>
             <div>Mecânico: <strong>${revisao.mecanico_responsavel}</strong></div>
           </div>
@@ -786,14 +798,10 @@ export default function App() {
       const usuarioEncontrado = { ...data, ultimo_acesso: agoraAcesso } as Usuario;
       setUsuarioLogado(usuarioEncontrado);
       salvarLoginLocal(usuarioEncontrado);
-      
-      if (usuarioEncontrado.tipo === 'operador') {
-        setTela('operacaoDiaria');
-      } else if (usuarioEncontrado.tipo === 'mecanico') {
-        setTela('chamados');
-      } else {
-        setTela('dashboard');
-      }
+
+      if (usuarioEncontrado.tipo === 'operador') setTela('operacaoDiaria');
+      else if (usuarioEncontrado.tipo === 'mecanico') setTela('chamados');
+      else setTela('dashboard');
 
       await carregarDados(false);
     } finally {
@@ -900,6 +908,8 @@ export default function App() {
       await supabase.from('historico_chamados').delete().eq('chamado_id', chamadoAlvo.id);
       await supabase.from('chamados').delete().eq('id', chamadoAlvo.id);
       localStorage.removeItem(`controlmaq_assinatura_${chamadoAlvo.id}`);
+      localStorage.removeItem(`controlmaq_foto_${chamadoAlvo.id}`);
+      localStorage.removeItem(`controlmaq_foto_fim_${chamadoAlvo.id}`);
       setChamados((prev) => prev.filter((c) => c.id !== chamadoAlvo.id));
     } finally {
       setSalvando(false);
@@ -953,37 +963,6 @@ export default function App() {
     }
   }
 
-  async function alternarPerfilUsuario(usuarioAlvo: Usuario) {
-    if (!isAdmin || usuarioLogado?.id === usuarioAlvo.id) return;
-    const novoPerfil: PerfilUsuario =
-      usuarioAlvo.tipo === 'admin'
-        ? 'mecanico'
-        : usuarioAlvo.tipo === 'mecanico'
-        ? 'operador'
-        : 'admin';
-    try {
-      setSalvando(true);
-      await supabase.from('usuarios').update({ tipo: novoPerfil }).eq('id', usuarioAlvo.id);
-      await carregarDados(false);
-    } finally {
-      setSalvando(false);
-    }
-  }
-
-  async function excluirUsuario(usuarioAlvo: Usuario) {
-    if (!isAdmin || usuarioLogado?.id === usuarioAlvo.id) return;
-    const confirmar = confirm(`Eliminar o utilizador ${usuarioAlvo.nome}?`);
-    if (!confirmar) return;
-
-    try {
-      setSalvando(true);
-      await supabase.from('usuarios').delete().eq('id', usuarioAlvo.id);
-      await carregarDados(false);
-    } finally {
-      setSalvando(false);
-    }
-  }
-
   async function criarChamado(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!usuarioLogado) {
@@ -1027,21 +1006,24 @@ export default function App() {
         .single();
 
       if (error) {
-        console.error('Erro ao gravar chamado no Supabase:', error);
         alert('Erro ao gravar chamado: ' + error.message);
         return;
       }
 
       if (data) {
+        if (fotoNovoChamado) {
+          localStorage.setItem(`controlmaq_foto_${data.id}`, fotoNovoChamado);
+        }
         setChamados((prev) => [data as Chamado, ...prev]);
         setMaquinaNovoChamado('');
+        setFotoNovoChamado('');
         setFiltroChamados('Todos');
         setTela('chamados');
         alert('Ordem de Serviço criada com sucesso!');
       }
-    } catch (err: any) {
-      console.error('Falha geral ao criar chamado:', err);
-      alert('Erro inesperado: ' + (err?.message || 'Verifique a sua ligação.'));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Verifique a sua ligação.';
+      alert('Erro inesperado: ' + msg);
     } finally {
       setSalvando(false);
     }
@@ -1080,6 +1062,7 @@ export default function App() {
     if (chamado) {
       setChamadoParaFinalizar(chamado);
       setAssinaturaDataUrl('');
+      setFotoFinalizacao('');
       setTela('finalizarChamado');
     }
   }
@@ -1122,10 +1105,13 @@ export default function App() {
         if (assinaturaDataUrl) {
           localStorage.setItem(`controlmaq_assinatura_${chamadoSalvo.id}`, assinaturaDataUrl);
         }
+        if (fotoFinalizacao) {
+          localStorage.setItem(`controlmaq_foto_fim_${chamadoSalvo.id}`, fotoFinalizacao);
+        }
         setChamados((prev) => prev.map((c) => (c.id === chamadoParaFinalizar.id ? chamadoSalvo : c)));
         setChamadoParaFinalizar(null);
         setTela('chamados');
-        if (confirm('Deseja gerar o comprovativo em PDF com a assinatura?')) {
+        if (confirm('Deseja gerar o comprovativo em PDF com fotos e assinatura?')) {
           gerarPdfChamado(chamadoSalvo);
         }
       }
@@ -1248,10 +1234,8 @@ export default function App() {
           <form onSubmit={entrarNoApp}>
             <label style={estilos.label}>Utilizador</label>
             <input name="usuario" type="text" placeholder="Seu login" style={estilos.input} required />
-
             <label style={estilos.label}>Palavra-passe</label>
             <input name="senha" type="password" placeholder="••••••••" style={estilos.input} required />
-
             <button type="submit" style={{ ...estilos.botaoNovoSubmit, marginTop: '16px', padding: '12px' }} disabled={salvando}>
               {salvando ? 'A entrar...' : 'Entrar no Sistema'}
             </button>
@@ -1291,6 +1275,62 @@ export default function App() {
           maxWidth: '100vw',
         }}
       >
+        {/* BARRA SUPERIOR DE INDICADORES TÉCNICOS (MTTR & DISPONIBILIDADE) */}
+        {isAdmin && (
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '10px', marginBottom: '16px' }}>
+            <div className="kpi-card">
+              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>DISPONIBILIDADE</span>
+              <div style={{ fontSize: '22px', fontWeight: 900, color: taxaDisponibilidade >= 85 ? '#16a34a' : '#dc2626' }}>
+                {taxaDisponibilidade}%
+              </div>
+              <small style={{ fontSize: '10px', color: '#64748b' }}>{maquinasOperacionais}/{totalMaquinas} operando</small>
+            </div>
+            <div className="kpi-card">
+              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>MTTR (MÉDIO)</span>
+              <div style={{ fontSize: '22px', fontWeight: 900, color: '#0f172a' }}>{mttrHoras} h</div>
+              <small style={{ fontSize: '10px', color: '#64748b' }}>Tempo médio de reparo</small>
+            </div>
+            <div className="kpi-card">
+              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>CHAMADOS ATIVOS</span>
+              <div style={{ fontSize: '22px', fontWeight: 900, color: '#f59e0b' }}>
+                {chamadosAbertos.length + chamadosAssumidos.length}
+              </div>
+              <small style={{ fontSize: '10px', color: '#64748b' }}>{chamadosAbertos.length} pendentes</small>
+            </div>
+            <div className="kpi-card">
+              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>PREVENTIVAS CRÍTICAS</span>
+              <div style={{ fontSize: '22px', fontWeight: 900, color: preventivasCriticas.length > 0 ? '#dc2626' : '#16a34a' }}>
+                {preventivasCriticas.length}
+              </div>
+              <small style={{ fontSize: '10px', color: '#64748b' }}>Revisões urgentes</small>
+            </div>
+          </div>
+        )}
+
+        {/* ALERTA DE PREVENTIVAS PRÓXIMAS / VENCIDAS */}
+        {preventivasCriticas.length > 0 && (
+          <div className="alerta-preventiva">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '18px' }}>⚠️</span>
+              <div>
+                <strong style={{ fontSize: '13px', color: '#9f1239' }}>Atenção: {preventivasCriticas.length} máquinas necessitam de revisão imediata!</strong>
+                <div style={{ fontSize: '11px', color: '#be123c' }}>
+                  TAGs: {preventivasCriticas.map((p) => p.tag).join(', ')}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setFiltroPreventivas('Todos');
+                setTela('preventivas');
+              }}
+              style={{ ...estilos.botaoNovo, background: '#e11d48', color: '#fff', fontSize: '11px' }}
+            >
+              Ver Revisões
+            </button>
+          </div>
+        )}
+
         {/* TELA 1: DASHBOARD EXECUTIVO */}
         {tela === 'dashboard' && isAdmin && (
           <DashboardExecutivo
@@ -1512,7 +1552,7 @@ export default function App() {
                     >
                       📥 CSV
                     </button>
-                    <button onClick={() => { setMaquinaNovoChamado(''); setTela('novoChamado'); }} style={estilos.botaoNovo}>
+                    <button onClick={() => { setMaquinaNovoChamado(''); setFotoNovoChamado(''); setTela('novoChamado'); }} style={estilos.botaoNovo}>
                       + Abrir OS
                     </button>
                   </>
@@ -1573,51 +1613,61 @@ export default function App() {
                     </p>
                   </div>
                 ) : (
-                  chamadosFiltrados.map((c) => (
-                    <div key={c.id} className="cm-card" style={estilos.cardMaquinaNovo}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                        <div>
-                          <strong>{c.maquina}</strong>
-                          <span style={{ fontSize: '11px', color: '#94a3b8', marginLeft: '6px' }}>#{c.id}</span>
+                  chamadosFiltrados.map((c) => {
+                    const fotoChamado = localStorage.getItem(`controlmaq_foto_${c.id}`);
+                    return (
+                      <div key={c.id} className="cm-card" style={estilos.cardMaquinaNovo}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                          <div>
+                            <strong>{c.maquina}</strong>
+                            <span style={{ fontSize: '11px', color: '#94a3b8', marginLeft: '6px' }}>#{c.id}</span>
+                          </div>
+                          <span className={`cm-badge badge-${c.status.toLowerCase()}`}>{c.status}</span>
                         </div>
-                        <span className={`cm-badge badge-${c.status.toLowerCase()}`}>{c.status}</span>
-                      </div>
-                      <p style={{ margin: '0 0 10px', fontSize: '13px' }}>{c.problema}</p>
-                      <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '12px', display: 'grid', gap: '3px' }}>
-                        <div>📍 {c.local}</div>
-                        <div>👤 Solicitante: {c.solicitante}</div>
-                        {isAdmin && <div>🔧 Mecânico: <strong>{c.mecanico || 'Não designado'}</strong></div>}
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '6px' }}>
-                        <button onClick={() => { setChamadoDetalhes(c); setTela('detalhesChamado'); }} style={estilos.botaoAjustarHorimetro}>
-                          Ver
-                        </button>
+                        <p style={{ margin: '0 0 8px', fontSize: '13px' }}>{c.problema}</p>
                         
-                        {isAdmin && c.status === 'Aberto' && (
-                          <button onClick={() => designarMecanicoAdmin(c.id)} style={estilos.botaoCardPrincipal}>
-                            Designar
-                          </button>
+                        {fotoChamado && (
+                          <div style={{ marginBottom: '8px' }}>
+                            <img src={fotoChamado} alt="Evidência" style={{ width: '100%', maxHeight: '120px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e2e8f0' }} />
+                          </div>
                         )}
 
-                        {c.status === 'Assumido' && (
-                          <button onClick={() => abrirTelaFinalizar(c.id)} style={{ ...estilos.botaoCardPrincipal, background: '#16a34a' }}>
-                            Concluir OS
-                          </button>
-                        )}
+                        <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '12px', display: 'grid', gap: '3px' }}>
+                          <div>📍 {c.local}</div>
+                          <div>👤 Solicitante: {c.solicitante}</div>
+                          {isAdmin && <div>🔧 Mecânico: <strong>{c.mecanico || 'Não designado'}</strong></div>}
+                        </div>
 
-                        {c.status === 'Finalizado' && (
-                          <button onClick={() => gerarPdfChamado(c)} style={estilos.botaoCardPrincipal}>
-                            PDF
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '6px' }}>
+                          <button onClick={() => { setChamadoDetalhes(c); setTela('detalhesChamado'); }} style={estilos.botaoAjustarHorimetro}>
+                            Ver
                           </button>
-                        )}
+                          
+                          {isAdmin && c.status === 'Aberto' && (
+                            <button onClick={() => designarMecanicoAdmin(c.id)} style={estilos.botaoCardPrincipal}>
+                              Designar
+                            </button>
+                          )}
 
-                        {isAdmin && (
-                          <button onClick={() => excluirChamado(c)} style={estilos.botaoExcluirOS}>🗑</button>
-                        )}
+                          {c.status === 'Assumido' && (
+                            <button onClick={() => abrirTelaFinalizar(c.id)} style={{ ...estilos.botaoCardPrincipal, background: '#16a34a' }}>
+                              Concluir OS
+                            </button>
+                          )}
+
+                          {c.status === 'Finalizado' && (
+                            <button onClick={() => gerarPdfChamado(c)} style={estilos.botaoCardPrincipal}>
+                              PDF
+                            </button>
+                          )}
+
+                          {isAdmin && (
+                            <button onClick={() => excluirChamado(c)} style={estilos.botaoExcluirOS}>🗑</button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             )}
@@ -1694,6 +1744,21 @@ export default function App() {
               <input name="local" style={estilos.input} required />
               <label style={estilos.label}>Problema *</label>
               <textarea name="problema" style={estilos.textarea} required />
+
+              <label style={estilos.label}>Foto do Defeito / Evidência</label>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => converterImagemParaBase64(e, setFotoNovoChamado)}
+                style={{ ...estilos.input, padding: '4px' }}
+              />
+              {fotoNovoChamado && (
+                <div style={{ marginTop: '6px' }}>
+                  <img src={fotoNovoChamado} alt="Pré-visualização" style={{ maxHeight: '100px', borderRadius: '6px' }} />
+                </div>
+              )}
+
               <button type="submit" style={{ ...estilos.botaoNovoSubmit, marginTop: '14px' }} disabled={salvando}>
                 {salvando ? 'A gravar...' : 'Confirmar'}
               </button>
@@ -1712,9 +1777,23 @@ export default function App() {
               <label style={estilos.label}>Serviço Executado *</label>
               <textarea name="solucao" style={estilos.textarea} required />
               <label style={estilos.label}>Peças / Insumos Utilizados</label>
-              <input name="pecasUtilizadas" placeholder="Ex: Mangueira, Graxa..." style={estilos.input} />
+              <input name="pecasUtilizadas" placeholder="Ex: Mangueira hidráulica 1/2, Óleo 68..." style={estilos.input} />
 
-              <label style={{ ...estilos.label, marginTop: '12px' }}>Assinatura do Responsável na Obra / Técnico</label>
+              <label style={estilos.label}>Foto do Serviço Concluído / Peça Nova</label>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => converterImagemParaBase64(e, setFotoFinalizacao)}
+                style={{ ...estilos.input, padding: '4px' }}
+              />
+              {fotoFinalizacao && (
+                <div style={{ marginTop: '6px' }}>
+                  <img src={fotoFinalizacao} alt="Pré-visualização" style={{ maxHeight: '100px', borderRadius: '6px' }} />
+                </div>
+              )}
+
+              <label style={{ ...estilos.label, marginTop: '12px' }}>Assinatura Digital (Técnico / Responsável)</label>
               <QuadroAssinaturaDigital onChange={setAssinaturaDataUrl} />
 
               <button type="submit" style={{ ...estilos.botaoNovoSubmit, background: '#16a34a', marginTop: '16px' }} disabled={salvando}>
@@ -1732,7 +1811,7 @@ export default function App() {
             <p><strong>Problema:</strong> {chamadoDetalhes.problema}</p>
             {chamadoDetalhes.diagnostico_tecnico && <p><strong>Diagnóstico:</strong> {chamadoDetalhes.diagnostico_tecnico}</p>}
             {chamadoDetalhes.solucao && <p><strong>Solução:</strong> {chamadoDetalhes.solucao}</p>}
-            <button onClick={() => gerarPdfChamado(chamadoDetalhes)} style={estilos.botaoNovoSubmit}>📄 Gerar PDF</button>
+            <button onClick={() => gerarPdfChamado(chamadoDetalhes)} style={estilos.botaoNovoSubmit}>📄 Gerar PDF Completo</button>
           </div>
         )}
 
@@ -1797,7 +1876,9 @@ export default function App() {
                 <div key={p.maquina_id} className="cm-card" style={estilos.cardMaquinaNovo}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <strong>{p.tag}</strong>
-                    <span className="cm-badge badge-prev-atencao">{p.status_preventiva}</span>
+                    <span className={`cm-badge ${p.status_preventiva === 'Vencida' ? 'badge-op-parada' : p.status_preventiva === 'Urgente' ? 'badge-assumido' : 'badge-op-operacional'}`}>
+                      {p.status_preventiva}
+                    </span>
                   </div>
                   <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '10px' }}>
                     Atual: <strong>{p.horimetro_atual ?? 0} h</strong> | Próxima: <strong>{p.proxima_preventiva_horimetro ?? 'Pendente'} h</strong>
