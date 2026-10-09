@@ -1,89 +1,113 @@
-import type { Chamado, FiltroChamado, FiltroPreventiva, Maquina, Tela } from '../types/controlmaq';
-import type { DashboardAcao, DashboardFiltroAcao } from '../types/dashboard';
+import type {
+  Chamado,
+  Maquina,
+  Tela,
+  FiltroChamado,
+  FiltroPreventiva,
+} from '../types/controlmaq';
 
-type DashboardNavegacaoContexto = {
-  chamados: readonly Chamado[];
-  maquinas: readonly Maquina[];
+export type AcaoDashboard =
+  | { tipo: 'abrirChamado'; chamadoId: number }
+  | { tipo: 'novoChamado' }
+  | { tipo: 'irParaChamados' }
+  | {
+      tipo: 'irParaChamadosFiltrados';
+      filtro: 'Aberto' | 'Assumido' | 'Finalizado';
+    }
+  | { tipo: 'irParaMaquinas'; status?: 'Todos' | 'Operacional' | 'Parada' | 'Em manutenção' }
+  | { tipo: 'irParaHorimetros' }
+  | { tipo: 'irParaPreventivas'; status?: FiltroPreventiva }
+  | { tipo: 'irParaRelatorios' }
+  | { tipo: 'irParaIndicadores' }
+  | { tipo: 'irParaBackup' }
+  | { tipo: 'irParaHistoricoMaquina' }
+  | { tipo: 'irParaUsuarios' };
+
+interface NavegacaoContexto {
+  chamados: Chamado[];
+  maquinas: Maquina[];
   abrirChamado: (chamado: Chamado) => void;
   setTela: (tela: Tela) => void;
   setFiltroChamados: (filtro: FiltroChamado) => void;
-  setFiltroPrioridadeChamados: (valor: string) => void;
-  setFiltroMaquinaChamados: (valor: string) => void;
-  setFiltroMecanicoChamados: (valor: string) => void;
-  setFiltroDataInicioChamados: (valor: string) => void;
-  setFiltroDataFimChamados: (valor: string) => void;
-  setFiltroPreventivas: (filtro: FiltroPreventiva) => void;
-  setBuscaPreventivas: (valor: string) => void;
-  setFiltroControleHorimetros: (valor: 'todos' | 'atualizados' | 'pendentes') => void;
-  setBuscaControleHorimetros: (valor: string) => void;
-  setBuscaChamados: (valor: string) => void;
-  setBuscaMaquinas: (valor: string) => void;
-  setMaquinaSelecionada: (valor: string) => void;
-};
-
-function limparFiltrosChamados(contexto: DashboardNavegacaoContexto): void {
-  contexto.setFiltroChamados('Todos');
-  contexto.setFiltroPrioridadeChamados('');
-  contexto.setFiltroMaquinaChamados('');
-  contexto.setFiltroMecanicoChamados('');
-  contexto.setFiltroDataInicioChamados('');
-  contexto.setFiltroDataFimChamados('');
-  contexto.setBuscaChamados('');
-}
-
-function aplicarFiltroChamados(
-  filtro: DashboardFiltroAcao | undefined,
-  contexto: DashboardNavegacaoContexto,
-): void {
-  limparFiltrosChamados(contexto);
-  if (!filtro) return;
-
-  if (filtro.status) contexto.setFiltroChamados(filtro.status);
-  if (filtro.prioridade) contexto.setFiltroPrioridadeChamados(filtro.prioridade);
-  if (filtro.maquina) contexto.setFiltroMaquinaChamados(filtro.maquina);
-  if (filtro.busca) contexto.setBuscaChamados(filtro.busca);
-}
-
-function aplicarFiltroPreventivas(
-  filtro: DashboardFiltroAcao | undefined,
-  contexto: DashboardNavegacaoContexto,
-): void {
-  contexto.setFiltroPreventivas('Todos');
-  contexto.setBuscaPreventivas('');
-  if (filtro?.preventivaStatus && filtro.preventivaStatus !== 'Sem horímetro') {
-    contexto.setFiltroPreventivas(filtro.preventivaStatus);
-  }
-  if (filtro?.maquina) contexto.setBuscaPreventivas(filtro.maquina);
+  setFiltroPrioridadeChamados?: (p: string) => void;
+  setFiltroMaquinaChamados?: (m: string) => void;
+  setFiltroMecanicoChamados?: (mec: string) => void;
+  setFiltroDataInicioChamados?: (d: string) => void;
+  setFiltroDataFimChamados?: (d: string) => void;
+  setFiltroPreventivas?: (f: FiltroPreventiva) => void;
+  setBuscaPreventivas?: (b: string) => void;
+  setFiltroControleHorimetros?: (f: any) => void;
+  setBuscaControleHorimetros?: (b: string) => void;
+  setBuscaChamados?: (b: string) => void;
+  setBuscaMaquinas?: (b: string) => void;
+  setMaquinaSelecionada?: (m: string) => void;
+  setFiltroStatusMaquina?: (status: 'Todos' | 'Operacional' | 'Parada' | 'Em manutenção') => void;
 }
 
 export function executarAcaoDashboard(
-  acao: DashboardAcao,
-  contexto: DashboardNavegacaoContexto,
-): void {
-  if (acao.tipo === 'abrir_chamado' && acao.entidadeId !== undefined) {
-    const chamado = contexto.chamados.find((item) => String(item.id) === String(acao.entidadeId));
-    if (chamado) {
-      contexto.abrirChamado(chamado);
-      return;
+  acao: AcaoDashboard,
+  contexto: NavegacaoContexto
+) {
+  switch (acao.tipo) {
+    case 'abrirChamado': {
+      const chamadoEncontrado = contexto.chamados.find(
+        (c) => c.id === acao.chamadoId
+      );
+      if (chamadoEncontrado) {
+        contexto.abrirChamado(chamadoEncontrado);
+      } else {
+        contexto.setTela('chamados');
+      }
+      break;
     }
-  }
 
-  if (acao.tipo === 'abrir_maquina' && acao.entidadeId !== undefined) {
-    const maquina = contexto.maquinas.find((item) => String(item.id) === String(acao.entidadeId));
-    if (maquina) {
-      contexto.setMaquinaSelecionada(maquina.tag);
-      contexto.setBuscaMaquinas(maquina.tag);
-    } else {
-      contexto.setBuscaMaquinas('');
-      contexto.setMaquinaSelecionada('');
+    case 'novoChamado': {
+      contexto.setTela('novoChamado');
+      break;
     }
-  }
 
-  if (acao.destino === 'chamados') aplicarFiltroChamados(acao.filtro, contexto);
-  if (acao.destino === 'preventivas') aplicarFiltroPreventivas(acao.filtro, contexto);
-  if (acao.destino === 'horimetros') {
-    contexto.setBuscaControleHorimetros(acao.filtro?.maquina ?? '');
-    contexto.setFiltroControleHorimetros(acao.filtro?.horimetroPendente ? 'pendentes' : 'todos');
+    case 'irParaChamados': {
+      contexto.setFiltroChamados('Todos');
+      if (contexto.setBuscaChamados) contexto.setBuscaChamados('');
+      contexto.setTela('chamados');
+      break;
+    }
+
+    case 'irParaChamadosFiltrados': {
+      contexto.setFiltroChamados(acao.filtro);
+      if (contexto.setBuscaChamados) contexto.setBuscaChamados('');
+      contexto.setTela('chamados');
+      break;
+    }
+
+    case 'irParaMaquinas': {
+      if (acao.status && contexto.setFiltroStatusMaquina) {
+        contexto.setFiltroStatusMaquina(acao.status);
+      } else if (contexto.setFiltroStatusMaquina) {
+        contexto.setFiltroStatusMaquina('Todos');
+      }
+      if (contexto.setBuscaMaquinas) contexto.setBuscaMaquinas('');
+      contexto.setTela('maquinas');
+      break;
+    }
+
+    case 'irParaPreventivas': {
+      if (acao.status && contexto.setFiltroPreventivas) {
+        contexto.setFiltroPreventivas(acao.status);
+      } else if (contexto.setFiltroPreventivas) {
+        contexto.setFiltroPreventivas('Todos');
+      }
+      if (contexto.setBuscaPreventivas) contexto.setBuscaPreventivas('');
+      contexto.setTela('preventivas');
+      break;
+    }
+
+    case 'irParaHorimetros': {
+      contexto.setTela('horimetros');
+      break;
+    }
+
+    default:
+      break;
   }
-  contexto.setTela(acao.destino);
 }

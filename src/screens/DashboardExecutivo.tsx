@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import type {
   Chamado,
   Maquina,
@@ -56,39 +56,27 @@ export function DashboardExecutivo({
   ultimaSincronizacao,
   onAcao,
 }: DashboardProps) {
+  const [mostrarPendentesHorimetro, setMostrarPendentesHorimetro] = useState(false);
+
   const chamadosAbertos = chamados.filter((c) => c.status === 'Aberto');
   const chamadosAssumidos = chamados.filter((c) => c.status === 'Assumido');
   const chamadosFinalizados = chamados.filter((c) => c.status === 'Finalizado');
 
-  const urgentes = chamados.filter((c) => c.prioridade === 'Urgente');
-  const altaPrioridade = chamados.filter((c) => c.prioridade === 'Alta');
+  const urgentes = chamados.filter((c) => c.prioridade === 'Urgente' && c.status !== 'Finalizado');
+  const altas = chamados.filter((c) => c.prioridade === 'Alta' && c.status !== 'Finalizado');
 
   const maquinasParadas = maquinas.filter((m) => m.status_maquina === 'Parada');
   const preventivasVencidas = preventivas.filter(
     (p) => p.status_preventiva === 'Vencida'
   );
 
+  const hoje = new Date().toDateString();
   const leiturasHoje = leiturasHorimetro.filter(
-    (leitura) =>
-      new Date(leitura.created_at).toDateString() === new Date().toDateString()
+    (leitura) => new Date(leitura.created_at).toDateString() === hoje
   );
   const pendentesHorimetro = maquinas.filter(
     (m) => !leiturasHoje.some((l) => l.maquina_id === m.id)
   );
-
-  function calcularSituacaoMaquina(tag: string, chamados: Chamado[]): string {
-    if (!tag) return 'Indisponível';
-    const chamadosDaMaquina = chamados.filter(
-      (c) => normalizarTexto(c.maquina) === normalizarTexto(tag)
-    );
-    if (
-      chamadosDaMaquina.some(
-        (c) => c.status === 'Aberto' || c.status === 'Assumido'
-      )
-    )
-      return 'Em manutenção';
-    return 'Operacional';
-  }
 
   function formatarDuracao(minutos: number) {
     if (minutos <= 0) return '0min';
@@ -113,24 +101,24 @@ export function DashboardExecutivo({
   const maquinasOperacionais = maquinas.filter(
     (m) => m.status_maquina === 'Operacional'
   ).length;
-  const percentualOperacional =
+
+  const percentualDisponibilidade =
     totalMaquinas > 0
       ? Math.round((maquinasOperacionais / totalMaquinas) * 100)
-      : 0;
+      : 100;
+
+  // Cor status de disponibilidade
+  const corDisponibilidade =
+    percentualDisponibilidade >= 85
+      ? '#16a34a'
+      : percentualDisponibilidade >= 65
+      ? '#f59e0b'
+      : '#dc2626';
 
   const rankingMecanicos = Object.entries(
     chamadosFinalizados.reduce<Record<string, number>>((acc, c) => {
       const mecanico = c.mecanico || 'Não informado';
       acc[mecanico] = (acc[mecanico] || 0) + 1;
-      return acc;
-    }, {})
-  )
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
-
-  const rankingMaquinas = Object.entries(
-    chamados.reduce<Record<string, number>>((acc, c) => {
-      acc[c.maquina] = (acc[c.maquina] || 0) + 1;
       return acc;
     }, {})
   )
@@ -144,22 +132,27 @@ export function DashboardExecutivo({
 
   return (
     <div style={styles.container}>
-      {/* Linha superior - Resumo Executivo */}
+      {/* Linha superior - Boas vindas e Disponibilidade Operacional */}
       <div style={styles.gridTopo}>
         <div style={styles.heroCard}>
-          <h2 style={styles.heroTitulo}>Boa tarde, {usuario?.nome}.</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+            <span style={styles.tagEmpresa}>LOKMAX GESTÃO DE ATIVOS</span>
+          </div>
+          <h2 style={styles.heroTitulo}>Painel Técnico de Operações</h2>
           <p style={styles.heroSubtitulo}>
-            Existem {urgentes.length} situação(ões) prioritária(s) neste
-            momento, sendo{' '}
-            {chamadosAbertos.filter((c) => c.prioridade === 'Urgente').length}{' '}
-            crítica(s).
+            Olá, <strong>{usuario?.nome || 'Gestor'}</strong>. Atualmente existem{' '}
+            <strong style={{ color: urgentes.length > 0 ? '#dc2626' : '#0f172a' }}>
+              {urgentes.length} chamado(s) crítico(s)
+            </strong>{' '}
+            e <strong>{maquinasParadas.length} máquina(s) parada(s)</strong> demandando intervenção em campo.
           </p>
+
           <div style={styles.heroBadges}>
             <span style={styles.badgeOnline}>
-              <span style={styles.pontoOnline} /> Sistema online
+              <span style={styles.pontoOnline} /> Sistema Ativo & Sincronizado
             </span>
             <span style={styles.badgeAtualizado}>
-              Atualizado{' '}
+              Última sincronização:{' '}
               {ultimaSincronizacao
                 ? ultimaSincronizacao.toLocaleTimeString('pt-BR', {
                     hour: '2-digit',
@@ -170,116 +163,201 @@ export function DashboardExecutivo({
           </div>
         </div>
 
+        {/* Card de Confiabilidade / Disponibilidade da Frota */}
         <div style={styles.statusGeralCard}>
           <div style={styles.statusGeralTopo}>
-            <span style={styles.statusGeralTitulo}>Situação operacional</span>
-            <span style={styles.statusGeralCritica}>crítica</span>
+            <span style={styles.statusGeralTitulo}>Disponibilidade da Frota</span>
+            <span
+              style={{
+                ...styles.statusGeralBadge,
+                color: corDisponibilidade,
+                borderColor: corDisponibilidade,
+                background: `${corDisponibilidade}15`,
+              }}
+            >
+              {percentualDisponibilidade >= 85
+                ? 'ESTÁVEL'
+                : percentualDisponibilidade >= 65
+                ? 'ATENÇÃO'
+                : 'CRÍTICA'}
+            </span>
           </div>
+
           <div style={styles.statusGeralCentro}>
-            <div style={styles.circuloProgresso}>
-              <span style={styles.circuloNumero}>{percentualOperacional}</span>
-              <span style={styles.circuloTexto}>de 100</span>
+            {/* Medidor Circular em SVG Real */}
+            <div style={styles.graficoArcoContainer}>
+              <svg viewBox="0 0 100 100" style={{ width: '84px', height: '84px', transform: 'rotate(-90deg)' }}>
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="40"
+                  fill="transparent"
+                  stroke="#e2e8f0"
+                  strokeWidth="8"
+                />
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="40"
+                  fill="transparent"
+                  stroke={corDisponibilidade}
+                  strokeWidth="8"
+                  strokeDasharray="251.2"
+                  strokeDashoffset={251.2 - (251.2 * percentualDisponibilidade) / 100}
+                  strokeLinecap="round"
+                  style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+                />
+              </svg>
+              <div style={styles.textoDentroGrafico}>
+                <span style={styles.circuloNumero}>{percentualDisponibilidade}%</span>
+                <span style={styles.circuloTexto}>ativa</span>
+              </div>
             </div>
+
             <div style={styles.statusGeralInfo}>
-              <p style={styles.statusGeralTexto}>
-                <strong>{maquinasParadas.length}</strong> máquina(s) parada(s)
-              </p>
-              <div style={styles.avisoParcial}>
-                <span>Confiabilidade média</span>
-                <span>dados parciais</span>
+              <div style={styles.indicadorItem}>
+                <span style={{ color: '#64748b' }}>Frota total:</span>
+                <strong>{totalMaquinas} máquinas</strong>
+              </div>
+              <div style={styles.indicadorItem}>
+                <span style={{ color: '#16a34a' }}>● Em operação:</span>
+                <strong>{maquinasOperacionais} unid.</strong>
+              </div>
+              <div style={styles.indicadorItem}>
+                <span style={{ color: '#dc2626' }}>● Indisponíveis:</span>
+                <strong style={{ color: '#dc2626' }}>{maquinasParadas.length} unid.</strong>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Aviso de horímetros */}
+      {/* Alerta Expansível de Horímetros em Falta */}
       {pendentesHorimetro.length > 0 && (
         <div style={styles.avisoAmarelo}>
-          Dados parciais: Existem máquinas sem horímetro atual.
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '18px' }}>⚠️</span>
+              <span>
+                <strong>{pendentesHorimetro.length} máquina(s)</strong> sem apontamento de horímetro hoje.
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setMostrarPendentesHorimetro(!mostrarPendentesHorimetro)}
+                style={styles.botaoVerPendentes}
+              >
+                {mostrarPendentesHorimetro ? 'Ocultar Máquinas' : 'Ver Máquinas Pendentes'}
+              </button>
+              <button
+                type="button"
+                onClick={() => onAcao({ tipo: 'irParaHorimetros' })}
+                style={styles.botaoApontarHorimetro}
+              >
+                Registrar Leituras →
+              </button>
+            </div>
+          </div>
+
+          {mostrarPendentesHorimetro && (
+            <div style={styles.listaTagsHorimetros}>
+              {pendentesHorimetro.map((m) => (
+                <span key={m.id} style={styles.chipTagMaquina}>
+                  {m.tag} — <small style={{ opacity: 0.8 }}>{m.modelo}</small>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* KPIs principais */}
+      {/* KPIs Principais em Grid com Efeito Visual Moderno */}
       <div style={styles.gridKpis}>
         <KpiCard
-          titulo="Chamados abertos"
+          titulo="Ordens Abertas"
           numero={chamadosAbertos.length}
-          descricao="Solicitações ainda não finalizadas."
+          descricao="Aguardando atribuição de técnico"
           cor="#ef4444"
+          destaque={chamadosAbertos.length > 0}
           onClick={() =>
             onAcao({ tipo: 'irParaChamadosFiltrados', filtro: 'Aberto' })
           }
         />
         <KpiCard
-          titulo="Chamados urgentes"
+          titulo="Chamados Críticos"
           numero={urgentes.length}
-          descricao="Ocorrências com prioridade máxima."
-          cor="#f97316"
+          descricao="Ocorrências de emergência ativa"
+          cor="#dc2626"
+          destaque={urgentes.length > 0}
           onClick={() =>
             onAcao({ tipo: 'irParaChamadosFiltrados', filtro: 'Aberto' })
           }
         />
         <KpiCard
-          titulo="Máquinas paradas"
+          titulo="Máquinas Paradas"
           numero={maquinasParadas.length}
-          descricao="Equipamentos indisponíveis agora."
-          cor="#dc2626"
+          descricao="Equipamentos fora de combate"
+          cor="#b91c1c"
+          destaque={maquinasParadas.length > 0}
           onClick={() => onAcao({ tipo: 'irParaMaquinas' })}
         />
         <KpiCard
-          titulo="Preventivas vencidas"
+          titulo="Preventivas Vencidas"
           numero={preventivasVencidas.length}
-          descricao="Revisões que ultrapassaram o limite."
-          cor="#f59e0b"
+          descricao="Horímetro ultrapassou plano"
+          cor="#d97706"
+          destaque={preventivasVencidas.length > 0}
           onClick={() => onAcao({ tipo: 'irParaPreventivas' })}
         />
         <KpiCard
-          titulo="Horímetros pendentes"
-          numero={pendentesHorimetro.length}
-          descricao="Máquinas sem leitura registrada hoje."
-          cor="#7c3aed"
-          onClick={() => onAcao({ tipo: 'irParaHorimetros' })}
+          titulo="Em Atendimento"
+          numero={chamadosAssumidos.length}
+          descricao="Técnicos executando no campo"
+          cor="#2563eb"
+          destaque={false}
+          onClick={() =>
+            onAcao({ tipo: 'irParaChamadosFiltrados', filtro: 'Assumido' })
+          }
         />
       </div>
 
-      {/* Linha inferior - Central de atenção e rankings */}
+      {/* Grid Inferior: Ações Imediatas e Confiabilidade da Equipe */}
       <div style={styles.gridInferior}>
-        {/* Central de atenção */}
-        <div style={styles.cardCentralAtencao}>
-          <span style={styles.preTitulo}>Central de atenção</span>
-          <h3 style={styles.cardTitulo}>Prioridades da operação</h3>
-          <p style={styles.cardDescricao}>
-            O que precisa de ação, acompanhamento ou regularização.
-          </p>
+        {/* Painel de Prioridades e Intervenção Rápida */}
+        <div style={styles.cardExecutivo}>
+          <div style={styles.cardHeaderFlex}>
+            <div>
+              <span style={styles.preTitulo}>Ações Imediatas</span>
+              <h3 style={styles.cardTitulo}>Central de Resolução Rápida</h3>
+            </div>
+            <button
+              onClick={() => onAcao({ tipo: 'novoChamado' })}
+              style={styles.botaoAbrirOS}
+            >
+              + Nova OS
+            </button>
+          </div>
 
           <div style={styles.centralAtencaoLista}>
             <AtencaoItem
-              label="Críticas"
-              quantidade={
-                chamados.filter(
-                  (c) => c.prioridade === 'Urgente' && c.status !== 'Finalizado'
-                ).length
-              }
+              label="Urgências Não Atendidas"
+              quantidade={urgentes.length}
               cor="#ef4444"
               onClick={() =>
                 onAcao({ tipo: 'irParaChamadosFiltrados', filtro: 'Aberto' })
               }
             />
             <AtencaoItem
-              label="Atenção"
-              quantidade={
-                chamados.filter(
-                  (c) => c.prioridade === 'Alta' && c.status !== 'Finalizado'
-                ).length
-              }
+              label="Alta Prioridade"
+              quantidade={altas.length}
               cor="#f59e0b"
               onClick={() =>
-                onAcao({ tipo: 'irParaChamadosFiltrados', filtro: 'Assumido' })
+                onAcao({ tipo: 'irParaChamadosFiltrados', filtro: 'Aberto' })
               }
             />
             <AtencaoItem
-              label="Pendências"
+              label="Chamados em Andamento"
               quantidade={chamadosAssumidos.length}
               cor="#2563eb"
               onClick={() =>
@@ -287,66 +365,96 @@ export function DashboardExecutivo({
               }
             />
             <AtencaoItem
-              label="Vencidas"
+              label="Preventivas a Vencer/Vencidas"
               quantidade={preventivasVencidas.length}
-              cor="#dc2626"
+              cor="#b45309"
               onClick={() => onAcao({ tipo: 'irParaPreventivas' })}
             />
           </div>
 
-          <div style={styles.listaRanking}>
-            {rankingMecanicos.length > 0 ? (
-              rankingMecanicos.map(([nome, total], idx) => (
-                <div key={nome} style={styles.itemRanking}>
-                  <strong>
-                    {idx + 1}. {nome}
-                  </strong>
-                  <span>{total} finalizado(s)</span>
-                </div>
-              ))
-            ) : (
-              <p style={styles.semDados}>Sem mecânicos com finalizações.</p>
-            )}
+          {/* Lista com as 3 Máquinas com Intervenção Mais Urgente */}
+          <div style={{ marginTop: '16px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
+              Máquinas com intervenção pendente
+            </span>
+            <div style={{ display: 'grid', gap: '8px', marginTop: '8px' }}>
+              {maquinasParadas.length === 0 && preventivasVencidas.length === 0 ? (
+                <p style={styles.semDados}>Nenhuma máquina paralisada ou preventiva em atraso.</p>
+              ) : (
+                [...maquinasParadas.slice(0, 3)].map((m) => (
+                  <div key={m.id} style={styles.linhaAlertaMaquina}>
+                    <div>
+                      <strong style={{ color: '#dc2626' }}>{m.tag}</strong>
+                      <span style={{ fontSize: '12px', color: '#64748b', marginLeft: '8px' }}>
+                        {m.marca} {m.modelo} (Equipamento Parado)
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => onAcao({ tipo: 'irParaMaquinas' })}
+                      style={styles.botaoAcaoLinha}
+                    >
+                      Acessar Ativo
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Situação operacional consolidada */}
-        <div style={styles.cardSituacaoOperacional}>
-          <span style={styles.preTitulo}>Situação operacional</span>
-          <h3 style={styles.cardTitulo}>
-            Leitura consolidada do momento atual.
-          </h3>
-          <p style={styles.cardDescricao}>
-            Existem {urgentes.length} situação(ões) prioritária(s) neste
-            momento, sendo{' '}
-            {chamadosAbertos.filter((c) => c.prioridade === 'Urgente').length}{' '}
-            crítica(s).
-          </p>
+        {/* Indicadores de Eficiência Técnica e Desempenho */}
+        <div style={styles.cardExecutivo}>
+          <span style={styles.preTitulo}>Eficiência Técnica</span>
+          <h3 style={styles.cardTitulo}>Rendimento da Manutenção</h3>
 
           <div style={styles.statusResumo}>
             <div style={styles.statusResumoItem}>
-              <span style={styles.statusResumoNumero}>
-                {chamadosAbertos.length}
-              </span>
+              <span style={styles.statusResumoNumero}>{chamadosAbertos.length}</span>
               <span style={styles.statusResumoLabel}>Abertos</span>
             </div>
             <div style={styles.statusResumoItem}>
-              <span style={styles.statusResumoNumero}>
-                {chamadosAssumidos.length}
-              </span>
-              <span style={styles.statusResumoLabel}>Em atendimento</span>
+              <span style={styles.statusResumoNumero}>{chamadosAssumidos.length}</span>
+              <span style={styles.statusResumoLabel}>Em Reparo</span>
             </div>
             <div style={styles.statusResumoItem}>
-              <span style={styles.statusResumoNumero}>
+              <span style={{ ...styles.statusResumoNumero, color: '#16a34a' }}>
                 {chamadosFinalizados.length}
               </span>
-              <span style={styles.statusResumoLabel}>Finalizados</span>
+              <span style={styles.statusResumoLabel}>Concluídos</span>
             </div>
           </div>
 
           <div style={styles.tempoMedioBox}>
-            <span>Tempo médio de atendimento</span>
-            <strong>{formatarDuracao(tempoMedioGeral)}</strong>
+            <div>
+              <span style={{ fontSize: '11px', color: '#1e40af', fontWeight: 700, textTransform: 'uppercase', display: 'block' }}>
+                Tempo Médio de Reparo (MTTR)
+              </span>
+              <span style={{ fontSize: '13px', color: '#334155' }}>Duração média por atendimento</span>
+            </div>
+            <strong style={{ fontSize: '20px', color: '#1e3a8a' }}>
+              {formatarDuracao(tempoMedioGeral)}
+            </strong>
+          </div>
+
+          <div style={{ marginTop: '12px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
+              Técnicos com Mais Finalizações
+            </span>
+            <div style={styles.listaRanking}>
+              {rankingMecanicos.length > 0 ? (
+                rankingMecanicos.map(([nome, total], idx) => (
+                  <div key={nome} style={styles.itemRanking}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={styles.medalhaRank}>{idx + 1}</span>
+                      <strong style={{ color: '#0f172a' }}>{nome}</strong>
+                    </div>
+                    <span style={styles.badgeFinalizados}>{total} concluído(s)</span>
+                  </div>
+                ))
+              ) : (
+                <p style={styles.semDados}>Nenhum atendimento finalizado registrado.</p>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -359,15 +467,26 @@ function KpiCard(props: {
   numero: number;
   descricao: string;
   cor: string;
+  destaque?: boolean;
   onClick?: () => void;
 }) {
   return (
-    <button type="button" style={styles.kpiCard} onClick={props.onClick}>
+    <button
+      type="button"
+      style={{
+        ...styles.kpiCard,
+        borderTop: `4px solid ${props.cor}`,
+        background: props.destaque ? '#fff' : '#ffffff',
+      }}
+      onClick={props.onClick}
+    >
       <div style={styles.kpiCabecalho}>
         <span style={{ ...styles.kpiPonto, background: props.cor }} />
         <span style={styles.kpiTitulo}>{props.titulo}</span>
       </div>
-      <strong style={styles.kpiNumero}>{props.numero}</strong>
+      <strong style={{ ...styles.kpiNumero, color: props.numero > 0 ? props.cor : '#0f172a' }}>
+        {props.numero}
+      </strong>
       <span style={styles.kpiDescricao}>{props.descricao}</span>
     </button>
   );
@@ -383,7 +502,14 @@ function AtencaoItem(props: {
     <button type="button" style={styles.atencaoItem} onClick={props.onClick}>
       <span style={{ ...styles.atencaoPonto, background: props.cor }} />
       <span style={styles.atencaoLabel}>{props.label}</span>
-      <strong style={styles.atencaoNumero}>{props.quantidade}</strong>
+      <strong
+        style={{
+          ...styles.atencaoNumero,
+          color: props.quantidade > 0 ? props.cor : '#64748b',
+        }}
+      >
+        {props.quantidade}
+      </strong>
     </button>
   );
 }
@@ -391,7 +517,7 @@ function AtencaoItem(props: {
 const styles: Record<string, CSSProperties> = {
   container: {
     display: 'grid',
-    gap: '18px',
+    gap: '20px',
     width: '100%',
     maxWidth: '100%',
   },
@@ -403,47 +529,55 @@ const styles: Record<string, CSSProperties> = {
   },
   heroCard: {
     background: '#ffffff',
-    borderRadius: '14px',
-    border: '1px solid #e4e7ec',
-    color: '#172033',
+    borderRadius: '16px',
+    border: '1px solid #e2e8f0',
+    color: '#0f172a',
     padding: '28px',
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'center',
-    minHeight: '180px',
-    boxShadow: '0 8px 24px rgba(16,24,40,.06)',
+    boxShadow: '0 4px 14px rgba(15,23,42,0.04)',
+  },
+  tagEmpresa: {
+    background: '#f8fafc',
+    border: '1px solid #cbd5e1',
+    color: '#475569',
+    fontSize: '11px',
+    fontWeight: 800,
+    letterSpacing: '0.6px',
+    padding: '4px 10px',
+    borderRadius: '6px',
   },
   heroTitulo: {
-    margin: 0,
-    fontSize: 'clamp(26px, 3vw, 36px)',
-    fontWeight: 800,
-    letterSpacing: '-1px',
-    color: '#172033',
-    lineHeight: 1.1,
+    margin: '8px 0 0',
+    fontSize: '26px',
+    fontWeight: 900,
+    letterSpacing: '-0.5px',
+    color: '#0f172a',
   },
   heroSubtitulo: {
-    margin: '12px 0 0',
-    color: '#667085',
-    fontSize: '15px',
+    margin: '10px 0 0',
+    color: '#475569',
+    fontSize: '14px',
     lineHeight: 1.5,
-    maxWidth: '500px',
+    maxWidth: '540px',
   },
   heroBadges: {
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
     flexWrap: 'wrap',
-    marginTop: '16px',
+    marginTop: '18px',
   },
   badgeOnline: {
     display: 'inline-flex',
     alignItems: 'center',
     gap: '8px',
-    background: '#ecfdf3',
-    color: '#027a48',
-    border: '1px solid #abefc6',
-    padding: '7px 12px',
-    borderRadius: '999px',
+    background: '#ecfdf5',
+    color: '#047857',
+    border: '1px solid #a7f3d0',
+    padding: '6px 12px',
+    borderRadius: '20px',
     fontSize: '12px',
     fontWeight: 700,
   },
@@ -451,129 +585,155 @@ const styles: Record<string, CSSProperties> = {
     width: '8px',
     height: '8px',
     borderRadius: '50%',
-    background: '#12b76a',
+    background: '#10b981',
   },
   badgeAtualizado: {
     display: 'inline-flex',
     alignItems: 'center',
-    background: '#f2f4f7',
-    border: '1px solid #eaecf0',
-    color: '#344054',
-    padding: '7px 12px',
-    borderRadius: '999px',
+    background: '#f1f5f9',
+    border: '1px solid #e2e8f0',
+    color: '#475569',
+    padding: '6px 12px',
+    borderRadius: '20px',
     fontSize: '12px',
     fontWeight: 600,
   },
   statusGeralCard: {
     background: '#ffffff',
-    border: '1px solid #e4e7ec',
-    borderRadius: '14px',
-    padding: '22px',
+    border: '1px solid #e2e8f0',
+    borderRadius: '16px',
+    padding: '24px',
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
-    boxShadow: '0 1px 3px rgba(16,24,40,.04)',
+    boxShadow: '0 4px 14px rgba(15,23,42,0.04)',
   },
   statusGeralTopo: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '14px',
+    marginBottom: '16px',
   },
   statusGeralTitulo: {
-    color: '#172033',
+    color: '#0f172a',
     fontSize: '15px',
-    fontWeight: 700,
+    fontWeight: 800,
   },
-  statusGeralCritica: {
-    color: '#ef4444',
-    fontSize: '12px',
-    fontWeight: 700,
+  statusGeralBadge: {
+    fontSize: '11px',
+    fontWeight: 800,
     textTransform: 'uppercase',
+    padding: '3px 8px',
+    borderRadius: '6px',
+    borderWidth: '1px',
+    borderStyle: 'solid',
   },
   statusGeralCentro: {
     display: 'flex',
     alignItems: 'center',
-    gap: '16px',
+    gap: '20px',
   },
-  circuloProgresso: {
-    width: '72px',
-    height: '72px',
-    borderRadius: '50%',
-    border: '5px solid #f2f4f7',
-    borderTopColor: '#fdb515',
-    borderRightColor: '#fdb515',
-    background: '#ffffff',
+  graficoArcoContainer: {
+    position: 'relative',
+    width: '84px',
+    height: '84px',
     display: 'grid',
     placeItems: 'center',
     flexShrink: 0,
   },
+  textoDentroGrafico: {
+    position: 'absolute',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   circuloNumero: {
-    fontSize: '20px',
-    fontWeight: 800,
-    color: '#172033',
+    fontSize: '18px',
+    fontWeight: 900,
+    color: '#0f172a',
     lineHeight: 1,
   },
   circuloTexto: {
     fontSize: '10px',
-    color: '#667085',
-    lineHeight: 1,
-    marginTop: '2px',
+    color: '#64748b',
+    fontWeight: 700,
+    textTransform: 'uppercase',
   },
   statusGeralInfo: {
     display: 'grid',
-    gap: '8px',
-    minWidth: 0,
+    gap: '6px',
+    width: '100%',
   },
-  statusGeralTexto: {
-    margin: 0,
-    color: '#667085',
-    fontSize: '13px',
-    lineHeight: 1.4,
-  },
-  avisoParcial: {
-    background: '#fffaeb',
-    border: '1px solid #fedf89',
-    color: '#93370d',
-    padding: '8px 10px',
-    borderRadius: '8px',
-    fontSize: '11px',
-    fontWeight: 600,
+  indicadorItem: {
     display: 'flex',
     justifyContent: 'space-between',
-    gap: '8px',
+    fontSize: '13px',
+    padding: '4px 0',
+    borderBottom: '1px dashed #f1f5f9',
   },
   avisoAmarelo: {
-    background: '#fffaeb',
-    border: '1px solid #fedf89',
-    color: '#93370d',
-    padding: '12px 16px',
-    borderRadius: '10px',
-    fontSize: '14px',
-    fontWeight: 600,
-    textAlign: 'center',
+    background: '#fffbeb',
+    border: '1px solid #fde68a',
+    color: '#92400e',
+    padding: '14px 18px',
+    borderRadius: '12px',
+    fontSize: '13px',
     width: '100%',
-    boxSizing: 'border-box',
+  },
+  botaoVerPendentes: {
+    background: '#ffffff',
+    border: '1px solid #fcd34d',
+    color: '#b45309',
+    padding: '6px 12px',
+    borderRadius: '6px',
+    fontWeight: 700,
+    fontSize: '12px',
+    cursor: 'pointer',
+  },
+  botaoApontarHorimetro: {
+    background: '#d97706',
+    border: 0,
+    color: '#ffffff',
+    padding: '6px 14px',
+    borderRadius: '6px',
+    fontWeight: 700,
+    fontSize: '12px',
+    cursor: 'pointer',
+  },
+  listaTagsHorimetros: {
+    display: 'flex',
+    gap: '8px',
+    flexWrap: 'wrap',
+    marginTop: '12px',
+    paddingTop: '12px',
+    borderTop: '1px dashed #fde68a',
+  },
+  chipTagMaquina: {
+    background: '#fef3c7',
+    border: '1px solid #fde68a',
+    color: '#78350f',
+    padding: '3px 8px',
+    borderRadius: '6px',
+    fontSize: '11px',
+    fontWeight: 700,
   },
   gridKpis: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
     gap: '14px',
-    alignItems: 'stretch',
   },
   kpiCard: {
-    background: '#ffffff',
-    border: '1px solid #e4e7ec',
-    borderRadius: '12px',
-    padding: '18px',
+    borderRadius: '14px',
+    padding: '20px',
     display: 'grid',
-    gap: '8px',
+    gap: '6px',
     textAlign: 'left',
     cursor: 'pointer',
-    color: '#172033',
-    boxShadow: '0 1px 3px rgba(16,24,40,.04)',
+    color: '#0f172a',
+    border: '1px solid #e2e8f0',
+    boxShadow: '0 2px 6px rgba(15,23,42,0.03)',
     transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-    minHeight: '130px',
   },
   kpiCabecalho: {
     display: 'flex',
@@ -586,69 +746,64 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: '50%',
   },
   kpiTitulo: {
-    color: '#667085',
+    color: '#64748b',
     fontSize: '13px',
     fontWeight: 700,
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
   },
   kpiNumero: {
-    fontSize: '38px',
-    fontWeight: 800,
+    fontSize: '34px',
+    fontWeight: 900,
     lineHeight: 1,
     letterSpacing: '-1px',
+    margin: '4px 0',
   },
   kpiDescricao: {
-    color: '#98a2b3',
-    fontSize: '12px',
-    lineHeight: 1.4,
+    color: '#94a3b8',
+    fontSize: '11px',
+    lineHeight: 1.3,
   },
   gridInferior: {
     display: 'grid',
-    gridTemplateColumns: 'minmax(0, 1.4fr) minmax(320px, 0.6fr)',
+    gridTemplateColumns: 'minmax(0, 1.3fr) minmax(320px, 0.7fr)',
     gap: '18px',
     alignItems: 'start',
   },
-  cardCentralAtencao: {
+  cardExecutivo: {
     background: '#ffffff',
-    border: '1px solid #e4e7ec',
-    borderRadius: '14px',
-    padding: '22px',
-    boxShadow: '0 1px 3px rgba(16,24,40,.04)',
+    border: '1px solid #e2e8f0',
+    borderRadius: '16px',
+    padding: '24px',
+    boxShadow: '0 4px 14px rgba(15,23,42,0.04)',
     display: 'grid',
-    gap: '16px',
+    gap: '14px',
   },
-  cardSituacaoOperacional: {
-    background: '#ffffff',
-    border: '1px solid #e4e7ec',
-    borderRadius: '14px',
-    padding: '22px',
-    boxShadow: '0 1px 3px rgba(16,24,40,.04)',
-    display: 'grid',
-    gap: '16px',
-    alignContent: 'start',
+  cardHeaderFlex: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   preTitulo: {
-    color: '#fdb515',
-    fontSize: '10px',
+    color: '#64748b',
+    fontSize: '11px',
     fontWeight: 800,
     textTransform: 'uppercase',
-    letterSpacing: '0.08em',
+    letterSpacing: '0.6px',
   },
   cardTitulo: {
-    margin: 0,
-    color: '#172033',
-    fontSize: '20px',
-    fontWeight: 750,
-    letterSpacing: '-0.3px',
-    lineHeight: 1.3,
+    margin: '4px 0 0',
+    color: '#0f172a',
+    fontSize: '18px',
+    fontWeight: 800,
   },
-  cardDescricao: {
-    margin: 0,
-    color: '#667085',
-    fontSize: '14px',
-    lineHeight: 1.5,
+  botaoAbrirOS: {
+    background: '#0f172a',
+    color: '#ffffff',
+    border: 0,
+    padding: '8px 14px',
+    borderRadius: '8px',
+    fontWeight: 700,
+    fontSize: '12px',
+    cursor: 'pointer',
   },
   centralAtencaoLista: {
     display: 'grid',
@@ -656,17 +811,16 @@ const styles: Record<string, CSSProperties> = {
     gap: '10px',
   },
   atencaoItem: {
-    background: '#f9fafb',
-    border: '1px solid #eaecf0',
+    background: '#f8fafc',
+    border: '1px solid #e2e8f0',
     borderRadius: '10px',
-    padding: '12px',
+    padding: '12px 14px',
     display: 'grid',
     gridTemplateColumns: 'auto 1fr auto',
     alignItems: 'center',
     gap: '8px',
     cursor: 'pointer',
     textAlign: 'left',
-    color: '#344054',
   },
   atencaoPonto: {
     width: '6px',
@@ -676,35 +830,30 @@ const styles: Record<string, CSSProperties> = {
   atencaoLabel: {
     fontSize: '12px',
     fontWeight: 700,
-    color: '#344054',
+    color: '#334155',
   },
   atencaoNumero: {
-    fontSize: '18px',
-    fontWeight: 800,
-    color: '#172033',
+    fontSize: '16px',
+    fontWeight: 900,
   },
-  listaRanking: {
-    display: 'grid',
-    gap: '8px',
-    marginTop: '8px',
-  },
-  itemRanking: {
+  linhaAlertaMaquina: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: '12px',
-    background: '#f9fafb',
-    border: '1px solid #eaecf0',
+    background: '#fef2f2',
+    border: '1px solid #fee2e2',
+    padding: '10px 14px',
     borderRadius: '8px',
-    padding: '10px 12px',
-    color: '#344054',
-    fontSize: '13px',
   },
-  semDados: {
-    color: '#98a2b3',
-    fontSize: '13px',
-    margin: 0,
-    padding: '12px 0',
+  botaoAcaoLinha: {
+    background: '#ffffff',
+    border: '1px solid #fca5a5',
+    color: '#b91c1c',
+    padding: '4px 10px',
+    borderRadius: '6px',
+    fontWeight: 700,
+    fontSize: '11px',
+    cursor: 'pointer',
   },
   statusResumo: {
     display: 'grid',
@@ -712,8 +861,8 @@ const styles: Record<string, CSSProperties> = {
     gap: '10px',
   },
   statusResumoItem: {
-    background: '#f9fafb',
-    border: '1px solid #eaecf0',
+    background: '#f8fafc',
+    border: '1px solid #e2e8f0',
     borderRadius: '10px',
     padding: '14px',
     display: 'grid',
@@ -721,30 +870,64 @@ const styles: Record<string, CSSProperties> = {
     gap: '4px',
   },
   statusResumoNumero: {
-    fontSize: '26px',
-    fontWeight: 800,
-    color: '#172033',
+    fontSize: '24px',
+    fontWeight: 900,
+    color: '#0f172a',
     lineHeight: 1,
   },
   statusResumoLabel: {
     fontSize: '11px',
-    color: '#667085',
-    fontWeight: 600,
-    textAlign: 'center',
+    color: '#64748b',
+    fontWeight: 700,
+    textTransform: 'uppercase',
   },
   tempoMedioBox: {
     background: '#eff6ff',
-    border: '1px solid #bfdbfe',
+    border: '1px solid #dbeafe',
     borderRadius: '10px',
-    padding: '14px',
+    padding: '14px 18px',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: '10px',
+  },
+  listaRanking: {
+    display: 'grid',
+    gap: '8px',
+    marginTop: '6px',
+  },
+  itemRanking: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    background: '#f8fafc',
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
+    padding: '8px 12px',
+    fontSize: '13px',
+  },
+  medalhaRank: {
+    width: '20px',
+    height: '20px',
+    borderRadius: '50%',
+    background: '#e2e8f0',
+    color: '#0f172a',
+    fontSize: '11px',
+    fontWeight: 800,
+    display: 'grid',
+    placeItems: 'center',
+  },
+  badgeFinalizados: {
+    background: '#dcfce7',
+    color: '#15803d',
+    padding: '3px 8px',
+    borderRadius: '12px',
+    fontSize: '11px',
+    fontWeight: 700,
+  },
+  semDados: {
+    color: '#94a3b8',
+    fontSize: '13px',
+    margin: 0,
+    padding: '8px 0',
   },
 };
-
-if (typeof window !== 'undefined' && window.innerWidth < 900) {
-  styles.gridTopo = { ...styles.gridTopo, gridTemplateColumns: '1fr' };
-  styles.gridInferior = { ...styles.gridInferior, gridTemplateColumns: '1fr' };
-}
