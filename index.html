@@ -2,67 +2,46 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>ControlMaq</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>ControlMaq - Gestão de Manutenção</title>
 
+    <!-- Ficheiro de Manifesto PWA -->
     <link rel="manifest" href="/manifest.json" />
+
+    <!-- Cores de tema e barra de estado -->
     <meta name="theme-color" content="#0f172a" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="ControlMaq" />
+
+    <!-- Ícones da aplicação -->
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
   </head>
   <body>
     <div id="root"></div>
 
-    <!-- Botão de Instalação PWA Dinâmico -->
-    <div id="pwa-install-banner" style="display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 99999; width: 90%; max-width: 380px; background: #0f172a; border: 2px solid #f59e0b; padding: 14px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center; color: white; font-family: sans-serif;">
-      <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px;">Instalar o ControlMaq como Aplicativo</div>
-      <button id="pwa-install-btn" style="background: #f59e0b; color: #000; border: none; padding: 10px 18px; border-radius: 8px; font-weight: 900; font-size: 13px; cursor: pointer; width: 100%;">
-        📲 Instalar no Telemóvel
-      </button>
-    </div>
-
+    <!-- Registo automático do Service Worker para suporte PWA -->
     <script>
-      // Registo obrigatório do Service Worker
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').then(() => {
-            console.log('[PWA] Service Worker ativo.');
-          }).catch(err => {
-            console.error('[PWA] Falha no Service Worker:', err);
-          });
+          navigator.serviceWorker
+            .register('/sw.js')
+            .then(() => {
+              console.log('[PWA] Service Worker registado com sucesso.');
+            })
+            .catch((erro) => {
+              console.error('[PWA] Erro ao registar Service Worker:', erro);
+            });
         });
       }
-
-      // Captura do evento de instalação oficial do Chrome/Android
-      let deferredPrompt;
-      const banner = document.getElementById('pwa-install-banner');
-      const btn = document.getElementById('pwa-install-btn');
-
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        banner.style.display = 'block';
-      });
-
-      btn.addEventListener('click', async () => {
-        if (deferredPrompt) {
-          deferredPrompt.prompt();
-          const { outcome } = await deferredPrompt.userChoice;
-          if (outcome === 'accepted') {
-            banner.style.display = 'none';
-          }
-          deferredPrompt = null;
-        }
-      });
-
-      window.addEventListener('appinstalled', () => {
-        banner.style.display = 'none';
-      });
     </script>
 
+    <!-- Ponto de entrada da aplicação React -->
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

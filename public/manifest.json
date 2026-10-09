@@ -1,6 +1,11 @@
 {
   "short_name": "ControlMaq",
   "name": "ControlMaq - Gestão de Frotas",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#090d16",
+  "theme_color": "#0f172a",
   "icons": [
     {
       "src": "/icon-192.png",
@@ -14,11 +19,5 @@
       "sizes": "512x512",
       "purpose": "any maskable"
     }
-  ],
-  "start_url": "/",
-  "background_color": "#090d16",
-  "theme_color": "#0f172a",
-  "display": "standalone",
-  "orientation": "portrait",
-  "scope": "/"
+  ]
 }
