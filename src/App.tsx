@@ -42,7 +42,6 @@ import { DashboardExecutivo } from './screens/DashboardExecutivo';
 import { executarAcaoDashboard } from './utils/dashboardNavegacao';
 
 export default function App() {
-  // Detector dinâmico de ecrã móvel
   const [isMobile, setIsMobile] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       return window.innerWidth <= 900;
@@ -736,7 +735,7 @@ export default function App() {
       }
 
       const agoraAcesso = new Date().toISOString();
-      await supabase.from('usuarios').update({ ultimo_acesso: agoraAcesso }).eq('id', data.id);
+      await supabase.from('usuarios').update({冷却acesso: agoraAcesso, ultimo_acesso: agoraAcesso }).eq('id', data.id);
 
       const usuarioEncontrado = { ...data, ultimo_acesso: agoraAcesso } as Usuario;
       setUsuarioLogado(usuarioEncontrado);
@@ -1968,10 +1967,47 @@ function Topo(props: {
 
   return (
     <>
+      {/* Fundo escurecido no telemóvel ao abrir menu */}
+      {props.isMobile && menuAberto && (
+        <div
+          onClick={() => setMenuAberto(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            zIndex: 49,
+            backdropFilter: 'blur(2px)',
+          }}
+        />
+      )}
+
       <aside className={`controlmaq-desktop-sidebar ${menuAberto ? 'controlmaq-sidebar-open' : ''}`} style={estilos.sidebar}>
-        <div style={{ padding: '16px', borderBottom: '1px solid #1e293b', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ background: '#f59e0b', color: '#000', fontWeight: 900, padding: '6px 10px', borderRadius: '6px' }}>CM</div>
-          <strong>ControlMaq</strong>
+        <div style={{ padding: '16px', borderBottom: '1px solid #1e293b', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ background: '#f59e0b', color: '#000', fontWeight: 900, padding: '6px 10px', borderRadius: '6px' }}>CM</div>
+            <strong>ControlMaq</strong>
+          </div>
+          {/* Botão de Fechar o Menu (✕) visível no telemóvel */}
+          {props.isMobile && (
+            <button
+              onClick={() => setMenuAberto(false)}
+              style={{
+                background: 'rgba(255,255,255,0.1)',
+                border: 0,
+                color: '#fff',
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                fontSize: '16px',
+                cursor: 'pointer',
+                display: 'grid',
+                placeItems: 'center',
+                fontWeight: 800,
+              }}
+            >
+              ✕
+            </button>
+          )}
         </div>
         <nav style={{ padding: '10px', display: 'grid', gap: '4px' }}>
           {itens.filter((i) => !i.admin || isAdmin).map((item) => (
