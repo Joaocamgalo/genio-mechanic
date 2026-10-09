@@ -24,11 +24,11 @@ import type {
   PreventivaMaquina,
   HistoricoPreventiva,
   FiltroPreventiva,
+  PerfilUsuario,
 } from './types/controlmaq';
 import {
   CHAVE_USUARIO_LOGADO,
   normalizarTexto,
-  hojeISO,
   prioridadeOrdem,
   calcularSituacaoMaquina,
 } from './utils/controlmaq';
@@ -80,9 +80,18 @@ export default function App() {
   const [filtroMaquinaChamados, setFiltroMaquinaChamados] = useState('');
   const [filtroMecanicoChamados, setFiltroMecanicoChamados] = useState('');
 
-  // Filtros de Máquinas
+  // Filtros e Gestão de Máquinas
   const [filtroStatusMaquina, setFiltroStatusMaquina] = useState<'Todos' | 'Operacional' | 'Parada' | 'Em manutenção'>('Todos');
   const [buscaMaquinas, setBuscaMaquinas] = useState('');
+  const [modalNovaMaquina, setModalNovaMaquina] = useState(false);
+  const [maquinaEmEdicao, setMaquinaEmEdicao] = useState<Maquina | null>(null);
+  const [maquinaDossie, setMaquinaDossie] = useState<Maquina | null>(null);
+
+  // Apontamento de Horímetro em Lote
+  const [leiturasLote, setLeiturasLote] = useState<Record<string, string>>({});
+
+  // Filtros de Usuários
+  const [buscaUsuarios, setBuscaUsuarios] = useState('');
 
   // Filtros de Preventivas
   const [filtroPreventivas, setFiltroPreventivas] = useState<FiltroPreventiva>('Todos');
@@ -214,6 +223,16 @@ export default function App() {
     return p.status_preventiva === filtroPreventivas;
   });
 
+  const usuariosFiltrados = usuarios.filter((u) => {
+    const busca = normalizarTexto(buscaUsuarios);
+    if (!busca) return true;
+    return (
+      normalizarTexto(u.nome).includes(busca) ||
+      normalizarTexto(u.login).includes(busca) ||
+      normalizarTexto(u.tipo).includes(busca)
+    );
+  });
+
   useEffect(() => {
     instalarCssResponsivo();
     carregarDados(false);
@@ -222,6 +241,7 @@ export default function App() {
       .channel('controlmaq-sync-master')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chamados' }, () => carregarDados(false))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'maquinas' }, () => carregarDados(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'usuarios' }, () => carregarDados(false))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leituras_horimetro' }, () => carregarDados(false))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'historico_preventivas' }, () => carregarDados(false))
       .subscribe();
@@ -414,7 +434,6 @@ export default function App() {
         border: 2px solid #ffffff;
       }
 
-      /* Estilos do Kanban */
       .kanban-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(280px, 1fr));
@@ -451,7 +470,23 @@ export default function App() {
     document.head.appendChild(style);
   }
 
-  // GERADOR OFICIAL DE PDF DA ORDEM DE SERVIÇO COM ASSINATURA DIGITAL
+  // EXPORTADOR UNIVERSAL PARA CSV / EXCEL
+  function exportarParaCsv(nomeArquivo: string, cabecalhos: string[], linhas: (string | number)[][]) {
+    const conteudo = [
+      cabecalhos.join(';'),
+      ...linhas.map((l) => l.map((val) => `"${String(val ?? '').replace(/"/g, '""')}"`).join(';')),
+    ].join('\r\n');
+
+    const blob = new Blob(['\uFEFF' + conteudo], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', `${nomeArquivo}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // GERADOR OFICIAL DE PDF DA ORDEM DE SERVIÇO COM ASSINATURA DIGITAL & DOWNTIME
   function gerarPdfChamado(chamado: Chamado) {
     const janela = window.open('', '_blank');
     if (!janela) {
@@ -462,6 +497,15 @@ export default function App() {
     const dataAbertura = chamado.created_at ? new Date(chamado.created_at).toLocaleString('pt-BR') : 'Não informado';
     const dataConclusao = chamado.finalizado_at ? new Date(chamado.finalizado_at).toLocaleString('pt-BR') : 'Em andamento';
     const assinaturaSalva = localStorage.getItem(`controlmaq_assinatura_${chamado.id}`) || '';
+
+    // Cálculo de Downtime (Tempo total parada)
+    let downtimeTexto = 'Em atendimento';
+    if (chamado.created_at && chamado.finalizado_at) {
+      const ms = new Date(chamado.finalizado_at).getTime() - new Date(chamado.created_at).getTime();
+      const horas = Math.floor(ms / (1000 * 60 * 60));
+      const minutos = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+      downtimeTexto = `${horas}h ${minutos}m`;
+    }
 
     janela.document.open();
     janela.document.write(`
@@ -480,10 +524,10 @@ export default function App() {
             .titulo-doc { text-align: right; }
             .titulo-doc h2 { margin: 0; font-size: 18px; color: #0f172a; text-transform: uppercase; }
             .titulo-doc span { font-size: 12px; color: #64748b; }
-            .bloco-dados { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 20px; }
+            .bloco-dados { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 16px; }
             .dado-item small { display: block; font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase; }
             .dado-item strong { font-size: 14px; color: #0f172a; }
-            .secao-titulo { font-size: 13px; font-weight: 800; text-transform: uppercase; color: #0f172a; border-left: 4px solid #f59e0b; padding-left: 8px; margin: 18px 0 8px; }
+            .secao-titulo { font-size: 13px; font-weight: 800; text-transform: uppercase; color: #0f172a; border-left: 4px solid #f59e0b; padding-left: 8px; margin: 16px 0 8px; }
             .conteudo-caixa { border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; font-size: 13px; line-height: 1.5; background: #ffffff; }
             .assinaturas { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px; }
             .linha-assinatura { border-top: 1px solid #94a3b8; text-align: center; padding-top: 8px; font-size: 12px; color: #475569; }
@@ -525,18 +569,18 @@ export default function App() {
               </div>
             </div>
 
-            <div class="bloco-dados" style="margin-top: -10px;">
+            <div class="bloco-dados">
               <div class="dado-item">
                 <small>Solicitante</small>
                 <strong>${chamado.solicitante}</strong>
               </div>
               <div class="dado-item">
-                <small>Telefone de Contato</small>
-                <strong>${chamado.telefone || 'Não informado'}</strong>
-              </div>
-              <div class="dado-item">
                 <small>Local do Atendimento</small>
                 <strong>${chamado.local}</strong>
+              </div>
+              <div class="dado-item">
+                <small>Tempo Parado (Downtime)</small>
+                <strong>${downtimeTexto}</strong>
               </div>
               <div class="dado-item">
                 <small>Mecânico Responsável</small>
@@ -545,19 +589,13 @@ export default function App() {
             </div>
 
             <div class="secao-titulo">Anomalia / Problema Relatado</div>
-            <div class="conteudo-caixa">
-              ${chamado.problema}
-            </div>
+            <div class="conteudo-caixa">${chamado.problema}</div>
 
             <div class="secao-titulo">Diagnóstico Técnico da Falha</div>
-            <div class="conteudo-caixa">
-              ${chamado.diagnostico_tecnico || 'Diagnóstico em elaboração ou pendente.'}
-            </div>
+            <div class="conteudo-caixa">${chamado.diagnostico_tecnico || 'Diagnóstico em elaboração ou pendente.'}</div>
 
-            <div class="secao-titulo">Serviço e Reparos Concluídos</div>
-            <div class="conteudo-caixa">
-              ${chamado.solucao || 'Serviço em execução.'}
-            </div>
+            <div class="secao-titulo">Serviço, Peças & Insumos Utilizados</div>
+            <div class="conteudo-caixa">${chamado.solucao || 'Serviço em execução.'}</div>
 
             <div class="assinaturas">
               <div>
@@ -578,6 +616,121 @@ export default function App() {
                 </div>
               </div>
             </div>
+          </div>
+          <script>window.onload = function() { window.print(); };</script>
+        </body>
+      </html>
+    `);
+    janela.document.close();
+  }
+
+  // GERADOR DE DOSSIÊ COMPLETO DO ATIVO (PRONTUÁRIO TÉCNICO EM PDF)
+  function gerarPdfDossie(m: Maquina) {
+    const janela = window.open('', '_blank');
+    if (!janela) {
+      alert('Permita pop-ups no navegador para visualizar o prontuário.');
+      return;
+    }
+
+    const chamadosDaMaquina = chamados.filter(
+      (c) => normalizarTexto(c.maquina) === normalizarTexto(m.tag)
+    );
+    const revisoesDaMaquina = historicoPreventivas.filter((h) => h.maquina_id === m.id);
+
+    janela.document.open();
+    janela.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Dossiê do Ativo - ${m.tag}</title>
+          <meta charset="UTF-8" />
+          <style>
+            * { box-sizing: border-box; }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; margin: 0; color: #0f172a; background: #fff; padding: 15mm; }
+            .pagina { width: 100%; max-width: 210mm; margin: 0 auto; }
+            .cabecalho { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 15px; margin-bottom: 20px; }
+            .logo-empresa { font-size: 24px; font-weight: 900; color: #0f172a; }
+            .logo-sub { font-size: 12px; color: #f59e0b; font-weight: 800; letter-spacing: 1px; }
+            .bloco-dados { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 20px; }
+            .dado-item small { display: block; font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase; }
+            .dado-item strong { font-size: 14px; color: #0f172a; }
+            .secao-titulo { font-size: 13px; font-weight: 800; text-transform: uppercase; color: #0f172a; border-left: 4px solid #f59e0b; padding-left: 8px; margin: 24px 0 10px; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+            th { background: #0f172a; color: #fff; text-align: left; padding: 8px 10px; }
+            td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; }
+            tr:nth-child(even) { background: #f8fafc; }
+            @media print { body { padding: 0; } @page { margin: 15mm; } }
+          </style>
+        </head>
+        <body>
+          <div class="pagina">
+            <header class="cabecalho">
+              <div>
+                <div class="logo-empresa">LOKMAX</div>
+                <div class="logo-sub">PRONTUÁRIO TÉCNICO & CICLO DE VIDA DO ATIVO</div>
+              </div>
+              <div style="text-align: right;">
+                <h2 style="margin: 0; font-size: 18px; text-transform: uppercase;">Dossiê do Ativo</h2>
+                <span style="font-size: 12px; color: #64748b;">Emitido em: ${new Date().toLocaleString('pt-BR')}</span>
+              </div>
+            </header>
+
+            <div class="bloco-dados">
+              <div class="dado-item"><small>TAG do Ativo</small><strong>${m.tag}</strong></div>
+              <div class="dado-item"><small>Fabricante / Marca</small><strong>${m.marca}</strong></div>
+              <div class="dado-item"><small>Modelo</small><strong>${m.modelo}</strong></div>
+              <div class="dado-item"><small>Horímetro Acumulado</small><strong>${m.horimetro ?? 0} h</strong></div>
+            </div>
+
+            <div class="secao-titulo">Histórico de Manutenções Preventivas (${revisoesDaMaquina.length} registradas)</div>
+            ${revisoesDaMaquina.length === 0 ? '<p style="font-size: 12px; color: #64748b;">Nenhuma revisão preventiva registrada.</p>' : `
+              <table>
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Horímetro</th>
+                    <th>Responsável</th>
+                    <th>Itens Substituídos / Descrição</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${revisoesDaMaquina.map((r) => `
+                    <tr>
+                      <td>${new Date(r.created_at).toLocaleDateString('pt-BR')}</td>
+                      <td><strong>${r.horimetro_preventiva} h</strong></td>
+                      <td>${r.mecanico_responsavel || 'Não informado'}</td>
+                      <td>${r.observacao}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            `}
+
+            <div class="secao-titulo">Histórico de Ordens de Serviço & Corretivas (${chamadosDaMaquina.length} registradas)</div>
+            ${chamadosDaMaquina.length === 0 ? '<p style="font-size: 12px; color: #64748b;">Nenhum chamado de manutenção corretiva registrado.</p>' : `
+              <table>
+                <thead>
+                  <tr>
+                    <th>OS #</th>
+                    <th>Status</th>
+                    <th>Data</th>
+                    <th>Falha / Problema</th>
+                    <th>Solução Técnica Aplicada</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${chamadosDaMaquina.map((c) => `
+                    <tr>
+                      <td>#${c.id}</td>
+                      <td><strong>${c.status}</strong></td>
+                      <td>${new Date(c.created_at).toLocaleDateString('pt-BR')}</td>
+                      <td>${c.problema}</td>
+                      <td>${c.solucao || 'Em atendimento'}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            `}
           </div>
           <script>window.onload = function() { window.print(); };</script>
         </body>
@@ -726,18 +879,146 @@ export default function App() {
     }
   }
 
-  // EXCLUSÃO / LIMPEZA DE ORDEM DE SERVIÇO COM CONFIRMAÇÃO
+  // CADASTRO / EDIÇÃO DE MÁQUINA
+  async function salvarMaquina(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!isAdmin) return;
+
+    const form = new FormData(event.currentTarget);
+    const tag = String(form.get('tag') || '').trim().toUpperCase();
+    const marca = String(form.get('marca') || '').trim();
+    const modelo = String(form.get('modelo') || '').trim();
+    const horimetro = Number(String(form.get('horimetro') || '0').replace(',', '.'));
+    const status_maquina = String(form.get('status_maquina') || 'Operacional') as Maquina['status_maquina'];
+
+    if (!tag || !marca || !modelo) {
+      alert('Preencha a TAG, Marca e Modelo do equipamento.');
+      return;
+    }
+
+    try {
+      setSalvando(true);
+
+      if (maquinaEmEdicao) {
+        // Modo Edição
+        const { error } = await supabase
+          .from('maquinas')
+          .update({ tag, marca, modelo, horimetro, status_maquina })
+          .eq('id', maquinaEmEdicao.id);
+
+        if (error) {
+          alert('Erro ao atualizar máquina.');
+          return;
+        }
+
+        setMaquinas((prev) =>
+          prev.map((m) => (m.id === maquinaEmEdicao.id ? { ...m, tag, marca, modelo, horimetro, status_maquina } : m))
+        );
+        alert(`Equipamento ${tag} atualizado com sucesso!`);
+      } else {
+        // Novo Cadastro
+        const { data, error } = await supabase
+          .from('maquinas')
+          .insert({ tag, marca, modelo, horimetro, status_maquina })
+          .select()
+          .single();
+
+        if (error || !data) {
+          alert('Erro ao cadastrar máquina. Verifique se a TAG já existe.');
+          return;
+        }
+
+        setMaquinas((prev) => [...prev, data as Maquina].sort((a, b) => a.tag.localeCompare(b.tag)));
+        alert(`Equipamento ${tag} inserido na frota com sucesso!`);
+      }
+
+      setModalNovaMaquina(false);
+      setMaquinaEmEdicao(null);
+      await carregarDados(false);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  // EXCLUSÃO DE MÁQUINA DA FROTA
+  async function excluirMaquina(m: Maquina) {
+    if (!isAdmin) return;
+
+    const confirmar = confirm(
+      `⚠️ ATENÇÃO: Confirma a remoção definitiva da máquina ${m.tag} (${m.marca} ${m.modelo}) da frota?\n\nEsta ação excluirá o ativo e os vínculos no sistema.`
+    );
+    if (!confirmar) return;
+
+    try {
+      setSalvando(true);
+
+      // Limpeza de dependências vinculadas no banco para não falhar
+      await supabase.from('leituras_horimetro').delete().eq('maquina_id', m.id);
+      await supabase.from('historico_preventivas').delete().eq('maquina_id', m.id);
+      await supabase.from('preventivas_maquinas').delete().eq('maquina_id', m.id);
+
+      const { error } = await supabase.from('maquinas').delete().eq('id', m.id);
+
+      if (error) {
+        alert('Erro ao excluir equipamento da frota.');
+        return;
+      }
+
+      setMaquinas((prev) => prev.filter((item) => item.id !== m.id));
+      alert(`Máquina ${m.tag} excluída da frota com sucesso!`);
+      await carregarDados(false);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  // APONTAMENTO DE HORÍMETRO EM LOTE
+  async function salvarHorimetrosEmLote() {
+    const alteracoes = Object.entries(leiturasLote).filter(([_, valor]) => valor && valor.trim() !== '');
+
+    if (alteracoes.length === 0) {
+      alert('Nenhum novo horímetro foi preenchido para salvar.');
+      return;
+    }
+
+    try {
+      setSalvando(true);
+      for (const [maquinaId, novoValorStr] of alteracoes) {
+        const valor = Number(novoValorStr.replace(',', '.'));
+        const maquinaAlvo = maquinas.find((m) => m.id === maquinaId);
+
+        if (Number.isFinite(valor) && valor >= 0 && maquinaAlvo) {
+          await supabase.from('maquinas').update({ horimetro: valor }).eq('id', maquinaId);
+          await supabase.from('leituras_horimetro').insert({
+            maquina_id: maquinaId,
+            maquina_tag: maquinaAlvo.tag,
+            operador_id: String(usuarioLogado?.id),
+            operador_nome: usuarioLogado?.nome,
+            horimetro: valor,
+            origem: 'apontamento_em_lote',
+            observacao: `Apontamento em lote (Anterior: ${maquinaAlvo.horimetro ?? 0} h)`,
+          });
+        }
+      }
+
+      setLeiturasLote({});
+      await carregarDados(false);
+      alert('Todas as leituras de horímetro foram salvas e sincronizadas!');
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  // EXCLUSÃO DE ORDEM DE SERVIÇO COM CONFIRMAÇÃO
   async function excluirChamado(chamadoAlvo: Chamado) {
     const confirmar = confirm(
-      `⚠️ ATENÇÃO: Confirma a exclusão da Ordem de Serviço #${chamadoAlvo.id}?\n\nMáquina: ${chamadoAlvo.maquina}\nProblema: ${chamadoAlvo.problema}\n\nEsta ação limpará o chamado do banco de dados definitivamente.`
+      `⚠️ ATENÇÃO: Confirma a exclusão da Ordem de Serviço #${chamadoAlvo.id}?\n\nMáquina: ${chamadoAlvo.maquina}\nProblema: ${chamadoAlvo.problema}\n\nEsta ação limpará o chamado definitivamente do sistema.`
     );
 
     if (!confirmar) return;
 
     try {
       setSalvando(true);
-
-      // Limpa os registros de histórico vinculados para evitar violação de integridade
       await supabase
         .from('historico_chamados')
         .delete()
@@ -753,11 +1034,159 @@ export default function App() {
         return;
       }
 
-      // Remove a assinatura local salva, se houver
       localStorage.removeItem(`controlmaq_assinatura_${chamadoAlvo.id}`);
-
       setChamados((prev) => prev.filter((c) => c.id !== chamadoAlvo.id));
       alert(`Ordem de Serviço #${chamadoAlvo.id} excluída com sucesso!`);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  // OPERAÇÕES ADMINISTRATIVAS DE UTILIZADORES
+  async function criarUsuario(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!isAdmin) return;
+
+    const form = new FormData(event.currentTarget);
+    const nome = String(form.get('nome') || '').trim();
+    const login = String(form.get('usuario') || '').trim().toLowerCase();
+    const senha = String(form.get('senha') || '').trim();
+    const tipo = String(form.get('perfil') || 'mecanico') as PerfilUsuario;
+
+    if (!nome || !login || !senha) {
+      alert('Preencha o nome, utilizador e palavra-passe.');
+      return;
+    }
+
+    try {
+      setSalvando(true);
+      const { data, error } = await supabase
+        .from('usuarios')
+        .insert({
+          nome,
+          login,
+          senha,
+          tipo,
+          ativo: true,
+        })
+        .select()
+        .single();
+
+      if (error || !data) {
+        alert('Erro ao registar utilizador. Verifique se o login já existe.');
+        return;
+      }
+
+      setUsuarios((prev) => [...prev, data as Usuario].sort((a, b) => a.nome.localeCompare(b.nome)));
+      alert(`Utilizador ${nome} registado com sucesso!`);
+      setTela('usuarios');
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function alterarSenhaUsuario(usuarioAlvo: Usuario) {
+    if (!isAdmin) return;
+    const novaSenha = prompt(`Digite a nova palavra-passe para ${usuarioAlvo.nome}:`);
+    if (!novaSenha || novaSenha.trim() === '') return;
+
+    try {
+      setSalvando(true);
+      const { error } = await supabase
+        .from('usuarios')
+        .update({ senha: novaSenha.trim() })
+        .eq('id', usuarioAlvo.id);
+
+      if (error) {
+        alert('Erro ao atualizar a palavra-passe.');
+        return;
+      }
+
+      setUsuarios((prev) =>
+        prev.map((u) => (u.id === usuarioAlvo.id ? { ...u, senha: novaSenha.trim() } : u))
+      );
+      alert('Palavra-passe alterada com sucesso.');
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function alternarStatusUsuario(usuarioAlvo: Usuario) {
+    if (!isAdmin) return;
+    if (usuarioLogado?.id === usuarioAlvo.id) {
+      alert('Não é possível bloquear o utilizador atualmente autenticado.');
+      return;
+    }
+
+    const novoStatus = usuarioAlvo.ativo === false;
+    try {
+      setSalvando(true);
+      const { error } = await supabase
+        .from('usuarios')
+        .update({ ativo: novoStatus })
+        .eq('id', usuarioAlvo.id);
+
+      if (!error) {
+        setUsuarios((prev) =>
+          prev.map((u) => (u.id === usuarioAlvo.id ? { ...u, ativo: novoStatus } : u))
+        );
+      }
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function alternarPerfilUsuario(usuarioAlvo: Usuario) {
+    if (!isAdmin) return;
+    if (usuarioLogado?.id === usuarioAlvo.id) {
+      alert('Por segurança, altere o perfil através de outra conta administradora.');
+      return;
+    }
+
+    const novoPerfil: PerfilUsuario =
+      usuarioAlvo.tipo === 'admin'
+        ? 'mecanico'
+        : usuarioAlvo.tipo === 'mecanico'
+        ? 'operador'
+        : 'admin';
+
+    try {
+      setSalvando(true);
+      const { error } = await supabase
+        .from('usuarios')
+        .update({ tipo: novoPerfil })
+        .eq('id', usuarioAlvo.id);
+
+      if (!error) {
+        setUsuarios((prev) =>
+          prev.map((u) => (u.id === usuarioAlvo.id ? { ...u, tipo: novoPerfil } : u))
+        );
+      }
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function excluirUsuario(usuarioAlvo: Usuario) {
+    if (!isAdmin || usuarioLogado?.id === usuarioAlvo.id) {
+      alert('Não é possível eliminar o utilizador com sessão iniciada.');
+      return;
+    }
+
+    const confirmar = confirm(`⚠️ Confirma a exclusão definitiva do utilizador ${usuarioAlvo.nome}?`);
+    if (!confirmar) return;
+
+    try {
+      setSalvando(true);
+      const { error } = await supabase
+        .from('usuarios')
+        .delete()
+        .eq('id', usuarioAlvo.id);
+
+      if (!error) {
+        setUsuarios((prev) => prev.filter((u) => u.id !== usuarioAlvo.id));
+        alert('Utilizador eliminado com sucesso.');
+      }
     } finally {
       setSalvando(false);
     }
@@ -872,12 +1301,22 @@ export default function App() {
     const form = new FormData(event.currentTarget);
     const diagnostico = String(form.get('diagnosticoTecnico') || '').trim();
     const solucao = String(form.get('solucao') || '').trim();
+    const pecasUtilizadas = String(form.get('pecasUtilizadas') || '').trim();
+    const custoPecas = String(form.get('custoPecas') || '').trim();
     const maquinaLiberada = form.get('maquinaLiberada') === 'sim';
     const necessitaRetorno = form.get('necessitaRetorno') === 'sim';
 
     if (!diagnostico || !solucao) {
       alert('Preencha o diagnóstico e o serviço realizado.');
       return;
+    }
+
+    let textoSolucaoCompleta = solucao;
+    if (pecasUtilizadas) {
+      textoSolucaoCompleta += ` | Peças/Insumos: ${pecasUtilizadas}`;
+    }
+    if (custoPecas) {
+      textoSolucaoCompleta += ` (Custo R$ ${custoPecas})`;
     }
 
     try {
@@ -888,7 +1327,7 @@ export default function App() {
         .update({
           status: 'Finalizado',
           diagnostico_tecnico: diagnostico,
-          solucao,
+          solucao: textoSolucaoCompleta,
           maquina_liberada: maquinaLiberada,
           necessita_retorno: necessitaRetorno,
           finalizado_por: usuarioLogado.nome,
@@ -1142,6 +1581,7 @@ export default function App() {
           setModoPreventiva(null);
           setPreventivaSelecionada(null);
           setMaquinaHistoricoModal(null);
+          setMaquinaDossie(null);
           resetarCamposRevisao();
           setTela(t);
         }}
@@ -1195,13 +1635,38 @@ export default function App() {
           />
         )}
 
-        {/* TELA 2: GESTÃO DA FROTA DE MÁQUINAS */}
+        {/* TELA 2: GESTÃO DA FROTA DE MÁQUINAS (CRUD COMPLETO & EXPORTAÇÃO) */}
         {tela === 'maquinas' && (
           <div>
             <div style={estilos.cabecalhoPagina}>
               <div>
                 <span style={estilos.preTitulo}>Inventário de Equipamentos</span>
                 <h2 style={estilos.tituloSecao}>Frota de Máquinas Ativas</h2>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() =>
+                    exportarParaCsv(
+                      'Frota_Lokmax',
+                      ['TAG', 'Marca', 'Modelo', 'Horímetro (h)', 'Status'],
+                      maquinas.map((m) => [m.tag, m.marca, m.modelo, m.horimetro ?? 0, m.status_maquina])
+                    )
+                  }
+                  style={estilos.botaoExportarCsv}
+                >
+                  📥 Exportar CSV
+                </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      setMaquinaEmEdicao(null);
+                      setModalNovaMaquina(true);
+                    }}
+                    style={estilos.botaoNovo}
+                  >
+                    + Nova Máquina
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1323,7 +1788,7 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '6px', borderTop: '1px solid #f1f5f9', paddingTop: '12px', marginBottom: '8px' }}>
                         <button
                           onClick={() => {
                             setMaquinaNovoChamado(maquina.tag);
@@ -1331,13 +1796,220 @@ export default function App() {
                           }}
                           style={estilos.botaoCardPrincipal}
                         >
-                          + Abrir Ordem de Serviço
+                          + Abrir OS
+                        </button>
+                        <button
+                          onClick={() => setMaquinaDossie(maquina)}
+                          style={estilos.botaoHistorico}
+                        >
+                          📋 Dossiê
                         </button>
                       </div>
+
+                      {isAdmin && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                          <button
+                            onClick={() => {
+                              setMaquinaEmEdicao(maquina);
+                              setModalNovaMaquina(true);
+                            }}
+                            style={{ ...estilos.botaoAjustarHorimetro, fontSize: '11px', padding: '6px 8px' }}
+                          >
+                            ✏️ Editar
+                          </button>
+                          <button
+                            onClick={() => excluirMaquina(maquina)}
+                            style={{ ...estilos.botaoExcluirOS, fontSize: '11px', padding: '6px 8px' }}
+                          >
+                            🗑️ Excluir
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })
               )}
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: CADASTRO / EDIÇÃO DE MÁQUINA */}
+        {modalNovaMaquina && isAdmin && (
+          <div style={estilos.modalOverlay}>
+            <div style={estilos.modalCard}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <h2 style={{ margin: 0, fontSize: '20px' }}>
+                  {maquinaEmEdicao ? `Editar Máquina: ${maquinaEmEdicao.tag}` : 'Cadastrar Novo Equipamento'}
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalNovaMaquina(false);
+                    setMaquinaEmEdicao(null);
+                  }}
+                  style={estilos.botaoFecharModal}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={salvarMaquina}>
+                <label style={estilos.label}>TAG / Identificação da Máquina *</label>
+                <input
+                  name="tag"
+                  defaultValue={maquinaEmEdicao?.tag}
+                  placeholder="Ex: C16X-01, RTX250-02, ST31-01"
+                  style={estilos.input}
+                  required
+                />
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={estilos.label}>Marca / Fabricante *</label>
+                    <input
+                      name="marca"
+                      defaultValue={maquinaEmEdicao?.marca}
+                      placeholder="Ex: Ditch Witch, Yanmar"
+                      style={estilos.input}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label style={estilos.label}>Modelo *</label>
+                    <input
+                      name="modelo"
+                      defaultValue={maquinaEmEdicao?.modelo}
+                      placeholder="Ex: C16X, ST31"
+                      style={estilos.input}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={estilos.label}>Horímetro Inicial (h)</label>
+                    <input
+                      name="horimetro"
+                      type="number"
+                      step="0.1"
+                      defaultValue={maquinaEmEdicao?.horimetro ?? 0}
+                      style={estilos.input}
+                    />
+                  </div>
+                  <div>
+                    <label style={estilos.label}>Status Operacional</label>
+                    <select
+                      name="status_maquina"
+                      defaultValue={maquinaEmEdicao?.status_maquina ?? 'Operacional'}
+                      style={estilos.input}
+                    >
+                      <option value="Operacional">Operacional</option>
+                      <option value="Parada">Parada</option>
+                      <option value="Em manutenção">Em manutenção</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '20px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModalNovaMaquina(false);
+                      setMaquinaEmEdicao(null);
+                    }}
+                    style={estilos.botaoAjustarHorimetro}
+                  >
+                    Cancelar
+                  </button>
+                  <button type="submit" style={estilos.botaoNovoSubmit} disabled={salvando}>
+                    {salvando ? 'Salvando...' : 'Gravar Equipamento'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: DOSSIÊ COMPLETO DO ATIVO */}
+        {maquinaDossie && (
+          <div style={estilos.modalOverlay}>
+            <div style={{ ...estilos.modalCard, maxWidth: '780px', maxHeight: '90vh', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '20px' }}>Dossiê do Ativo: {maquinaDossie.tag}</h2>
+                  <span style={{ fontSize: '13px', color: '#64748b' }}>
+                    {maquinaDossie.marca} • {maquinaDossie.modelo} — Horímetro: {maquinaDossie.horimetro ?? 0} h
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMaquinaDossie(null)}
+                  style={estilos.botaoFecharModal}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '14px' }}>
+                <button
+                  onClick={() => gerarPdfDossie(maquinaDossie)}
+                  style={estilos.botaoNovoSubmit}
+                >
+                  📄 Exportar Prontuário Completo (PDF)
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gap: '16px' }}>
+                {/* Seção 1: Revisões Preventivas */}
+                <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                  <strong style={{ display: 'block', fontSize: '13px', color: '#0f172a', marginBottom: '8px' }}>
+                    🔧 Histórico de Preventivas ({historicoPreventivas.filter((h) => h.maquina_id === maquinaDossie.id).length})
+                  </strong>
+                  {historicoPreventivas.filter((h) => h.maquina_id === maquinaDossie.id).length === 0 ? (
+                    <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>Nenhuma preventiva registrada.</p>
+                  ) : (
+                    <div style={{ display: 'grid', gap: '8px' }}>
+                      {historicoPreventivas
+                        .filter((h) => h.maquina_id === maquinaDossie.id)
+                        .map((rev) => (
+                          <div key={rev.id} style={{ background: '#fff', padding: '10px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                              <span>Revisão aos {rev.horimetro_preventiva} h</span>
+                              <span style={{ color: '#64748b' }}>{new Date(rev.created_at).toLocaleDateString('pt-BR')}</span>
+                            </div>
+                            <p style={{ margin: '4px 0 0', color: '#334155' }}>{rev.observacao}</p>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Seção 2: Ordens de Serviço Corretivas */}
+                <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                  <strong style={{ display: 'block', fontSize: '13px', color: '#0f172a', marginBottom: '8px' }}>
+                    ⚠️ Ordens de Serviço & Intervenções ({chamados.filter((c) => normalizarTexto(c.maquina) === normalizarTexto(maquinaDossie.tag)).length})
+                  </strong>
+                  {chamados.filter((c) => normalizarTexto(c.maquina) === normalizarTexto(maquinaDossie.tag)).length === 0 ? (
+                    <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>Nenhuma OS aberta para esta máquina.</p>
+                  ) : (
+                    <div style={{ display: 'grid', gap: '8px' }}>
+                      {chamados
+                        .filter((c) => normalizarTexto(c.maquina) === normalizarTexto(maquinaDossie.tag))
+                        .map((ch) => (
+                          <div key={ch.id} style={{ background: '#fff', padding: '10px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                              <span>OS #{ch.id} — Status: {ch.status}</span>
+                              <span style={{ color: '#64748b' }}>{new Date(ch.created_at).toLocaleDateString('pt-BR')}</span>
+                            </div>
+                            <div style={{ margin: '4px 0', color: '#334155' }}><strong>Falha:</strong> {ch.problema}</div>
+                            {ch.solucao && <div style={{ color: '#166534' }}><strong>Solução:</strong> {ch.solucao}</div>}
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -1437,7 +2109,7 @@ export default function App() {
           </div>
         )}
 
-        {/* TELA 4: PLANO PREVENTIVO */}
+        {/* TELA 4: PLANO PREVENTIVO (COM EXPORTAÇÃO CSV) */}
         {tela === 'preventivas' && (
           <div>
             <div style={estilos.cabecalhoPagina}>
@@ -1445,6 +2117,26 @@ export default function App() {
                 <span style={estilos.preTitulo}>Engenharia de Confiabilidade</span>
                 <h2 style={estilos.tituloSecao}>Plano de Manutenção Preventiva</h2>
               </div>
+              <button
+                onClick={() =>
+                  exportarParaCsv(
+                    'Plano_Preventivo_Lokmax',
+                    ['TAG', 'Marca', 'Modelo', 'Horímetro Atual', 'Próxima Revisão', 'Intervalo', 'Status'],
+                    preventivas.map((p) => [
+                      p.tag,
+                      p.marca,
+                      p.modelo,
+                      p.horimetro_atual ?? 0,
+                      p.proxima_preventiva_horimetro ?? 'Pendente',
+                      p.intervalo_horas ?? 0,
+                      p.status_preventiva,
+                    ])
+                  )
+                }
+                style={estilos.botaoExportarCsv}
+              >
+                📥 Exportar CSV
+              </button>
             </div>
 
             <div style={{ display: 'grid', gap: '14px', marginBottom: '20px' }}>
@@ -1563,7 +2255,7 @@ export default function App() {
           </div>
         )}
 
-        {/* TELA 5: HORÍMETROS */}
+        {/* TELA 5: HORÍMETROS (APONTAMENTO EM LOTE INTELIGENTE) */}
         {tela === 'horimetros' && (
           <div>
             <div style={estilos.cabecalhoPagina}>
@@ -1571,29 +2263,62 @@ export default function App() {
                 <span style={estilos.preTitulo}>Apontamento Diário</span>
                 <h2 style={estilos.tituloSecao}>Registo de Horímetros da Frota</h2>
               </div>
+              <button
+                onClick={salvarHorimetrosEmLote}
+                disabled={salvando || Object.keys(leiturasLote).length === 0}
+                style={{ ...estilos.botaoNovo, background: '#16a34a', color: '#fff' }}
+              >
+                💾 Salvar Todas as Leituras
+              </button>
             </div>
 
+            <p style={{ color: '#64748b', fontSize: '13px', margin: '-10px 0 20px' }}>
+              Preencha os novos horímetros dos equipamentos e salve tudo com um único clique.
+            </p>
+
             <div style={estilos.listaMaquinas}>
-              {maquinas.map((m) => (
-                <div key={m.id} className="cm-card" style={estilos.cardMaquinaNovo}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <strong style={{ fontSize: '18px' }}>{m.tag}</strong>
-                    <span style={{ fontSize: '12px', color: '#64748b' }}>{m.marca} {m.modelo}</span>
-                  </div>
-                  <div style={estilos.caixaHorimetro}>
-                    <div>
-                      <small style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase', fontWeight: 800 }}>Leitura Atual</small>
-                      <div style={{ fontSize: '20px', fontWeight: 900 }}>{m.horimetro ?? 0} h</div>
+              {maquinas.map((m) => {
+                const valorDigitado = leiturasLote[m.id] ?? '';
+                const numeroDigitado = Number(valorDigitado.replace(',', '.'));
+                const ehMenor = valorDigitado && Number.isFinite(numeroDigitado) && numeroDigitado < (m.horimetro ?? 0);
+
+                return (
+                  <div key={m.id} className="cm-card" style={estilos.cardMaquinaNovo}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <strong style={{ fontSize: '18px' }}>{m.tag}</strong>
+                      <span style={{ fontSize: '12px', color: '#64748b' }}>{m.marca} {m.modelo}</span>
                     </div>
-                    <button
-                      onClick={() => alterarHorimetroManual(m)}
-                      style={estilos.botaoCardPrincipal}
-                    >
-                      Apontar Leitura
-                    </button>
+
+                    <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
+                        <span style={{ color: '#64748b' }}>Leitura Atual:</span>
+                        <strong>{m.horimetro ?? 0} h</strong>
+                      </div>
+
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: '4px' }}>
+                        Nova Leitura (h)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        placeholder="Ex: 1250.5"
+                        value={valorDigitado}
+                        onChange={(e) => setLeiturasLote({ ...leiturasLote, [m.id]: e.target.value })}
+                        style={{
+                          ...estilos.input,
+                          borderColor: ehMenor ? '#dc2626' : '#cbd5e1',
+                          background: ehMenor ? '#fef2f2' : '#ffffff',
+                        }}
+                      />
+                      {ehMenor && (
+                        <small style={{ color: '#dc2626', fontSize: '10px', fontWeight: 700, display: 'block', marginTop: '4px' }}>
+                          ⚠️ Valor menor que o horímetro anterior!
+                        </small>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -1606,8 +2331,30 @@ export default function App() {
                 <span style={estilos.preTitulo}>Operações Ativas</span>
                 <h2 style={estilos.tituloSecao}>Quadro de Ordens de Serviço</h2>
               </div>
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                {/* Alternador de Visualização (Lista vs Kanban) */}
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  onClick={() =>
+                    exportarParaCsv(
+                      'Ordens_de_Servico_Lokmax',
+                      ['OS #', 'Máquina', 'Status', 'Cliente', 'Solicitante', 'Local', 'Mecânico', 'Problema', 'Solução'],
+                      chamados.map((c) => [
+                        c.id,
+                        c.maquina,
+                        c.status,
+                        c.cliente || '',
+                        c.solicitante,
+                        c.local,
+                        c.mecanico || '',
+                        c.problema,
+                        c.solucao || '',
+                      ])
+                    )
+                  }
+                  style={estilos.botaoExportarCsv}
+                >
+                  📥 Exportar CSV
+                </button>
+
                 <div style={{ display: 'flex', background: '#e2e8f0', padding: '3px', borderRadius: '8px' }}>
                   <button
                     onClick={() => setModoVisualizacao('lista')}
@@ -1662,7 +2409,6 @@ export default function App() {
               />
             </div>
 
-            {/* MODO 1: VISUALIZAÇÃO EM LISTA */}
             {modoVisualizacao === 'lista' && (
               <>
                 <div style={estilos.filtros}>
@@ -1771,10 +2517,8 @@ export default function App() {
               </>
             )}
 
-            {/* MODO 2: VISUALIZAÇÃO EM QUADRO KANBAN */}
             {modoVisualizacao === 'kanban' && (
               <div className="kanban-grid">
-                {/* COLUNA 1: ABERTOS */}
                 <div className="kanban-coluna">
                   <div className="kanban-coluna-header">
                     <strong style={{ color: '#dc2626', fontSize: '14px' }}>🔴 Abertos / Pendentes</strong>
@@ -1825,7 +2569,6 @@ export default function App() {
                   )}
                 </div>
 
-                {/* COLUNA 2: EM ATENDIMENTO */}
                 <div className="kanban-coluna">
                   <div className="kanban-coluna-header">
                     <strong style={{ color: '#d97706', fontSize: '14px' }}>🟡 Em Atendimento</strong>
@@ -1876,7 +2619,6 @@ export default function App() {
                   )}
                 </div>
 
-                {/* COLUNA 3: CONCLUÍDOS */}
                 <div className="kanban-coluna">
                   <div className="kanban-coluna-header">
                     <strong style={{ color: '#16a34a', fontSize: '14px' }}>🟢 Concluídos</strong>
@@ -1969,7 +2711,7 @@ export default function App() {
 
             {chamadoDetalhes.solucao && (
               <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '14px', borderRadius: '10px', marginBottom: '18px' }}>
-                <strong style={{ display: 'block', fontSize: '12px', color: '#166534', textTransform: 'uppercase' }}>Serviço Executado</strong>
+                <strong style={{ display: 'block', fontSize: '12px', color: '#166534', textTransform: 'uppercase' }}>Serviço & Insumos Utilizados</strong>
                 <p style={{ margin: '4px 0 0', lineHeight: 1.5, color: '#14532d' }}>{chamadoDetalhes.solucao}</p>
               </div>
             )}
@@ -2005,7 +2747,7 @@ export default function App() {
           </div>
         )}
 
-        {/* TELA 8: FINALIZAR CHAMADO COM ASSINATURA DIGITAL */}
+        {/* TELA 8: FINALIZAR CHAMADO COM INSUMOS, CUSTOS & ASSINATURA */}
         {tela === 'finalizarChamado' && chamadoParaFinalizar && (
           <div style={{ ...estilos.cardFormulario, maxWidth: '680px' }}>
             <button onClick={() => setTela('chamados')} style={estilos.botaoVoltar}>
@@ -2015,7 +2757,7 @@ export default function App() {
               Concluir OS #{chamadoParaFinalizar.id} — {chamadoParaFinalizar.maquina}
             </h2>
             <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '18px' }}>
-              Preencha os pareceres técnicos e colha a assinatura digital para fechar o atendimento.
+              Preencha os pareceres técnicos, insumos utilizados e colha a assinatura digital para fechar o atendimento.
             </p>
 
             <form onSubmit={concluirFinalizacao}>
@@ -2030,10 +2772,31 @@ export default function App() {
               <label style={estilos.label}>Serviço e Reparos Concluídos *</label>
               <textarea
                 name="solucao"
-                placeholder="Peças trocadas, regulagens efetuadas ou serviços executados..."
+                placeholder="Descreva os procedimentos efetuados..."
                 style={estilos.textarea}
                 required
               />
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={estilos.label}>Peças / Insumos Utilizados</label>
+                  <input
+                    name="pecasUtilizadas"
+                    placeholder="Ex: Mangueira 3/8, 4 dentes valetadeira, 2kg graxa"
+                    style={estilos.input}
+                  />
+                </div>
+                <div>
+                  <label style={estilos.label}>Custo Estimado (R$)</label>
+                  <input
+                    name="custoPecas"
+                    type="number"
+                    step="0.01"
+                    placeholder="Ex: 380.00"
+                    style={estilos.input}
+                  />
+                </div>
+              </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', margin: '14px 0' }}>
                 <div>
@@ -2067,6 +2830,191 @@ export default function App() {
                 disabled={salvando}
               >
                 {salvando ? 'Salvando...' : 'Concluir Chamado & Registrar Assinatura'}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* TELA 9: GESTÃO DE UTILIZADORES & TÉCNICOS */}
+        {tela === 'usuarios' && isAdmin && (
+          <div>
+            <div style={estilos.cabecalhoPagina}>
+              <div>
+                <span style={estilos.preTitulo}>Administração de Acessos</span>
+                <h2 style={estilos.tituloSecao}>Equipa Técnica e Utilizadores</h2>
+              </div>
+              <button
+                onClick={() => setTela('novoUsuario')}
+                style={estilos.botaoNovo}
+              >
+                + Novo Utilizador
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gap: '14px', marginBottom: '20px' }}>
+              <input
+                value={buscaUsuarios}
+                onChange={(e) => setBuscaUsuarios(e.target.value)}
+                placeholder="Pesquisar utilizador por nome, login ou perfil..."
+                style={estilos.inputBusca}
+              />
+            </div>
+
+            <div style={estilos.listaMaquinas}>
+              {usuariosFiltrados.map((u) => {
+                const isProprioUsuario = usuarioLogado?.id === u.id;
+                const perfilCor =
+                  u.tipo === 'admin'
+                    ? '#0f172a'
+                    : u.tipo === 'mecanico'
+                    ? '#f59e0b'
+                    : '#2563eb';
+
+                return (
+                  <div key={u.id} className="cm-card" style={estilos.cardMaquinaNovo}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: `${perfilCor}15`, color: perfilCor, display: 'grid', placeItems: 'center', fontWeight: 900, fontSize: '16px' }}>
+                          {u.nome.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <strong style={{ fontSize: '16px', color: '#0f172a', display: 'block' }}>
+                            {u.nome} {isProprioUsuario && <small style={{ color: '#16a34a', fontWeight: 700 }}>(Você)</small>}
+                          </strong>
+                          <span style={{ fontSize: '12px', color: '#64748b' }}>
+                            @{u.login}
+                          </span>
+                        </div>
+                      </div>
+
+                      <span
+                        className="cm-badge"
+                        style={{
+                          background: u.ativo ? '#ecfdf5' : '#fef2f2',
+                          color: u.ativo ? '#047857' : '#b91c1c',
+                          border: `1px solid ${u.ativo ? '#a7f3d0' : '#fecaca'}`,
+                        }}
+                      >
+                        {u.ativo ? '● Ativo' : '● Bloqueado'}
+                      </span>
+                    </div>
+
+                    <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '12px', fontSize: '13px', display: 'grid', gap: '4px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#64748b' }}>Perfil:</span>
+                        <strong style={{ textTransform: 'capitalize', color: perfilCor }}>{u.tipo}</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#64748b' }}>Último Acesso:</span>
+                        <span>{u.ultimo_acesso ? new Date(u.ultimo_acesso).toLocaleDateString('pt-BR') : 'Nunca acedeu'}</span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
+                      <button
+                        onClick={() => alterarSenhaUsuario(u)}
+                        style={{ ...estilos.botaoAjustarHorimetro, fontSize: '11px', padding: '6px 8px' }}
+                      >
+                        Mudar Senha
+                      </button>
+
+                      <button
+                        onClick={() => alternarPerfilUsuario(u)}
+                        disabled={isProprioUsuario}
+                        style={{ ...estilos.botaoAjustarHorimetro, fontSize: '11px', padding: '6px 8px', opacity: isProprioUsuario ? 0.5 : 1 }}
+                      >
+                        Trocar Perfil
+                      </button>
+
+                      <button
+                        onClick={() => alternarStatusUsuario(u)}
+                        disabled={isProprioUsuario}
+                        style={{
+                          ...estilos.botaoAjustarHorimetro,
+                          fontSize: '11px',
+                          padding: '6px 8px',
+                          color: u.ativo ? '#dc2626' : '#16a34a',
+                          opacity: isProprioUsuario ? 0.5 : 1,
+                        }}
+                      >
+                        {u.ativo ? 'Bloquear' : 'Desbloquear'}
+                      </button>
+
+                      <button
+                        onClick={() => excluirUsuario(u)}
+                        disabled={isProprioUsuario}
+                        style={{
+                          ...estilos.botaoExcluirOS,
+                          fontSize: '11px',
+                          padding: '6px 8px',
+                          opacity: isProprioUsuario ? 0.5 : 1,
+                        }}
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* TELA 10: REGISTO DE NOVO UTILIZADOR */}
+        {tela === 'novoUsuario' && isAdmin && (
+          <div style={estilos.cardFormulario}>
+            <button onClick={() => setTela('usuarios')} style={estilos.botaoVoltar}>
+              ← Cancelar
+            </button>
+            <h2 style={{ margin: '8px 0 6px', fontSize: '22px' }}>Registar Novo Membro da Equipa</h2>
+            <p style={{ color: '#64748b', fontSize: '13px', margin: '0 0 20px' }}>
+              Crie credenciais de acesso técnico com permissões personalizadas.
+            </p>
+
+            <form onSubmit={criarUsuario}>
+              <label style={estilos.label}>Nome Completo *</label>
+              <input
+                name="nome"
+                placeholder="Ex: Carlos Eduardo Silva"
+                style={estilos.input}
+                required
+              />
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={estilos.label}>Utilizador (Login) *</label>
+                  <input
+                    name="usuario"
+                    placeholder="Ex: carlos.mecanico"
+                    style={estilos.input}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={estilos.label}>Palavra-passe *</label>
+                  <input
+                    name="senha"
+                    type="password"
+                    placeholder="••••••••"
+                    style={estilos.input}
+                    required
+                  />
+                </div>
+              </div>
+
+              <label style={estilos.label}>Perfil de Permissão *</label>
+              <select name="perfil" style={estilos.input} defaultValue="mecanico">
+                <option value="mecanico">Mecânico / Técnico de Campo</option>
+                <option value="admin">Administrador (Controlo Total)</option>
+                <option value="operador">Operador de Equipamento</option>
+              </select>
+
+              <button
+                type="submit"
+                style={{ ...estilos.botaoNovoSubmit, marginTop: '20px' }}
+                disabled={salvando}
+              >
+                {salvando ? 'A guardar...' : 'Criar Utilizador'}
               </button>
             </form>
           </div>
@@ -2535,6 +3483,7 @@ function Topo(props: {
     { tela: 'maquinas', label: 'Frota de Máquinas' },
     { tela: 'preventivas', label: 'Plano Preventivo', admin: true },
     { tela: 'horimetros', label: 'Horímetros', admin: true },
+    { tela: 'usuarios', label: 'Equipa & Utilizadores', admin: true },
   ];
 
   return (
@@ -2686,6 +3635,16 @@ const estilos: Record<string, CSSProperties> = {
     padding: '10px 18px',
     borderRadius: '8px',
     fontWeight: 800,
+    fontSize: '13px',
+    cursor: 'pointer',
+  },
+  botaoExportarCsv: {
+    background: '#ffffff',
+    border: '1px solid #cbd5e1',
+    color: '#0f172a',
+    padding: '10px 14px',
+    borderRadius: '8px',
+    fontWeight: 700,
     fontSize: '13px',
     cursor: 'pointer',
   },
