@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import type {
   Chamado,
   Maquina,
@@ -56,6 +56,22 @@ export function DashboardExecutivo({
   ultimaSincronizacao,
   onAcao,
 }: DashboardProps) {
+  // Detector de dispositivo móvel em tempo real
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth <= 900;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    function tratarResize() {
+      setIsMobile(window.innerWidth <= 900);
+    }
+    window.addEventListener('resize', tratarResize);
+    return () => window.removeEventListener('resize', tratarResize);
+  }, []);
+
   const [mostrarPendentesHorimetro, setMostrarPendentesHorimetro] = useState(false);
 
   const chamadosAbertos = chamados.filter((c) => c.status === 'Aberto');
@@ -133,12 +149,19 @@ export function DashboardExecutivo({
   return (
     <div style={styles.container}>
       {/* Linha superior - Boas vindas e Disponibilidade Operacional */}
-      <div style={styles.gridTopo}>
-        <div style={styles.heroCard}>
+      <div
+        style={{
+          ...styles.gridTopo,
+          gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.4fr) minmax(320px, 0.6fr)',
+        }}
+      >
+        <div style={{ ...styles.heroCard, padding: isMobile ? '18px' : '28px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
             <span style={styles.tagEmpresa}>LOKMAX GESTÃO DE ATIVOS</span>
           </div>
-          <h2 style={styles.heroTitulo}>Painel Técnico de Operações</h2>
+          <h2 style={{ ...styles.heroTitulo, fontSize: isMobile ? '20px' : '26px' }}>
+            Painel Técnico de Operações
+          </h2>
           <p style={styles.heroSubtitulo}>
             Olá, <strong>{usuario?.nome || 'Gestor'}</strong>. Atualmente existem{' '}
             <strong style={{ color: urgentes.length > 0 ? '#dc2626' : '#0f172a' }}>
@@ -164,7 +187,7 @@ export function DashboardExecutivo({
         </div>
 
         {/* Card de Confiabilidade / Disponibilidade da Frota */}
-        <div style={styles.statusGeralCard}>
+        <div style={{ ...styles.statusGeralCard, padding: isMobile ? '18px' : '24px' }}>
           <div style={styles.statusGeralTopo}>
             <span style={styles.statusGeralTitulo}>Disponibilidade da Frota</span>
             <span
@@ -183,7 +206,14 @@ export function DashboardExecutivo({
             </span>
           </div>
 
-          <div style={styles.statusGeralCentro}>
+          <div
+            style={{
+              ...styles.statusGeralCentro,
+              flexDirection: isMobile ? 'column' : 'row',
+              alignItems: isMobile ? 'flex-start' : 'center',
+              gap: isMobile ? '14px' : '20px',
+            }}
+          >
             {/* Medidor Circular em SVG Real */}
             <div style={styles.graficoArcoContainer}>
               <svg viewBox="0 0 100 100" style={{ width: '84px', height: '84px', transform: 'rotate(-90deg)' }}>
@@ -242,7 +272,7 @@ export function DashboardExecutivo({
                 <strong>{pendentesHorimetro.length} máquina(s)</strong> sem apontamento de horímetro hoje.
               </span>
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <button
                 type="button"
                 onClick={() => setMostrarPendentesHorimetro(!mostrarPendentesHorimetro)}
@@ -272,8 +302,13 @@ export function DashboardExecutivo({
         </div>
       )}
 
-      {/* KPIs Principais em Grid com Efeito Visual Moderno */}
-      <div style={styles.gridKpis}>
+      {/* KPIs Principais em Grid Responsivo */}
+      <div
+        style={{
+          ...styles.gridKpis,
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
+        }}
+      >
         <KpiCard
           titulo="Ordens Abertas"
           numero={chamadosAbertos.length}
@@ -323,9 +358,14 @@ export function DashboardExecutivo({
       </div>
 
       {/* Grid Inferior: Ações Imediatas e Confiabilidade da Equipe */}
-      <div style={styles.gridInferior}>
+      <div
+        style={{
+          ...styles.gridInferior,
+          gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.3fr) minmax(320px, 0.7fr)',
+        }}
+      >
         {/* Painel de Prioridades e Intervenção Rápida */}
-        <div style={styles.cardExecutivo}>
+        <div style={{ ...styles.cardExecutivo, padding: isMobile ? '18px' : '24px' }}>
           <div style={styles.cardHeaderFlex}>
             <div>
               <span style={styles.preTitulo}>Ações Imediatas</span>
@@ -339,7 +379,12 @@ export function DashboardExecutivo({
             </button>
           </div>
 
-          <div style={styles.centralAtencaoLista}>
+          <div
+            style={{
+              ...styles.centralAtencaoLista,
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(140px, 1fr))',
+            }}
+          >
             <AtencaoItem
               label="Urgências Não Atendidas"
               quantidade={urgentes.length}
@@ -382,16 +427,27 @@ export function DashboardExecutivo({
                 <p style={styles.semDados}>Nenhuma máquina paralisada ou preventiva em atraso.</p>
               ) : (
                 [...maquinasParadas.slice(0, 3)].map((m) => (
-                  <div key={m.id} style={styles.linhaAlertaMaquina}>
+                  <div
+                    key={m.id}
+                    style={{
+                      ...styles.linhaAlertaMaquina,
+                      flexDirection: isMobile ? 'column' : 'row',
+                      alignItems: isMobile ? 'flex-start' : 'center',
+                      gap: isMobile ? '8px' : '0',
+                    }}
+                  >
                     <div>
                       <strong style={{ color: '#dc2626' }}>{m.tag}</strong>
-                      <span style={{ fontSize: '12px', color: '#64748b', marginLeft: '8px' }}>
+                      <span style={{ fontSize: '12px', color: '#64748b', marginLeft: isMobile ? '0' : '8px', display: isMobile ? 'block' : 'inline' }}>
                         {m.marca} {m.modelo} (Equipamento Parado)
                       </span>
                     </div>
                     <button
                       onClick={() => onAcao({ tipo: 'irParaMaquinas' })}
-                      style={styles.botaoAcaoLinha}
+                      style={{
+                        ...styles.botaoAcaoLinha,
+                        width: isMobile ? '100%' : 'auto',
+                      }}
                     >
                       Acessar Ativo
                     </button>
@@ -403,7 +459,7 @@ export function DashboardExecutivo({
         </div>
 
         {/* Indicadores de Eficiência Técnica e Desempenho */}
-        <div style={styles.cardExecutivo}>
+        <div style={{ ...styles.cardExecutivo, padding: isMobile ? '18px' : '24px' }}>
           <span style={styles.preTitulo}>Eficiência Técnica</span>
           <h3 style={styles.cardTitulo}>Rendimento da Manutenção</h3>
 
@@ -520,23 +576,25 @@ const styles: Record<string, CSSProperties> = {
     gap: '20px',
     width: '100%',
     maxWidth: '100%',
+    boxSizing: 'border-box',
   },
   gridTopo: {
     display: 'grid',
-    gridTemplateColumns: 'minmax(0, 1.4fr) minmax(320px, 0.6fr)',
     gap: '18px',
     alignItems: 'stretch',
+    width: '100%',
   },
   heroCard: {
     background: '#ffffff',
     borderRadius: '16px',
     border: '1px solid #e2e8f0',
     color: '#0f172a',
-    padding: '28px',
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'center',
     boxShadow: '0 4px 14px rgba(15,23,42,0.04)',
+    boxSizing: 'border-box',
+    wordBreak: 'break-word',
   },
   tagEmpresa: {
     background: '#f8fafc',
@@ -550,10 +608,10 @@ const styles: Record<string, CSSProperties> = {
   },
   heroTitulo: {
     margin: '8px 0 0',
-    fontSize: '26px',
     fontWeight: 900,
     letterSpacing: '-0.5px',
     color: '#0f172a',
+    wordBreak: 'break-word',
   },
   heroSubtitulo: {
     margin: '10px 0 0',
@@ -602,17 +660,19 @@ const styles: Record<string, CSSProperties> = {
     background: '#ffffff',
     border: '1px solid #e2e8f0',
     borderRadius: '16px',
-    padding: '24px',
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
     boxShadow: '0 4px 14px rgba(15,23,42,0.04)',
+    boxSizing: 'border-box',
+    wordBreak: 'break-word',
   },
   statusGeralTopo: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: '16px',
+    gap: '8px',
   },
   statusGeralTitulo: {
     color: '#0f172a',
@@ -630,8 +690,7 @@ const styles: Record<string, CSSProperties> = {
   },
   statusGeralCentro: {
     display: 'flex',
-    alignItems: 'center',
-    gap: '20px',
+    width: '100%',
   },
   graficoArcoContainer: {
     position: 'relative',
@@ -680,6 +739,7 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: '12px',
     fontSize: '13px',
     width: '100%',
+    boxSizing: 'border-box',
   },
   botaoVerPendentes: {
     background: '#ffffff',
@@ -720,8 +780,8 @@ const styles: Record<string, CSSProperties> = {
   },
   gridKpis: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
     gap: '14px',
+    width: '100%',
   },
   kpiCard: {
     borderRadius: '14px',
@@ -734,6 +794,8 @@ const styles: Record<string, CSSProperties> = {
     border: '1px solid #e2e8f0',
     boxShadow: '0 2px 6px rgba(15,23,42,0.03)',
     transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+    boxSizing: 'border-box',
+    width: '100%',
   },
   kpiCabecalho: {
     display: 'flex',
@@ -764,23 +826,26 @@ const styles: Record<string, CSSProperties> = {
   },
   gridInferior: {
     display: 'grid',
-    gridTemplateColumns: 'minmax(0, 1.3fr) minmax(320px, 0.7fr)',
     gap: '18px',
     alignItems: 'start',
+    width: '100%',
   },
   cardExecutivo: {
     background: '#ffffff',
     border: '1px solid #e2e8f0',
     borderRadius: '16px',
-    padding: '24px',
     boxShadow: '0 4px 14px rgba(15,23,42,0.04)',
     display: 'grid',
     gap: '14px',
+    boxSizing: 'border-box',
+    wordBreak: 'break-word',
+    width: '100%',
   },
   cardHeaderFlex: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    gap: '8px',
   },
   preTitulo: {
     color: '#64748b',
@@ -794,6 +859,7 @@ const styles: Record<string, CSSProperties> = {
     color: '#0f172a',
     fontSize: '18px',
     fontWeight: 800,
+    wordBreak: 'break-word',
   },
   botaoAbrirOS: {
     background: '#0f172a',
@@ -804,10 +870,10 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700,
     fontSize: '12px',
     cursor: 'pointer',
+    flexShrink: 0,
   },
   centralAtencaoLista: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
     gap: '10px',
   },
   atencaoItem: {
@@ -821,6 +887,8 @@ const styles: Record<string, CSSProperties> = {
     gap: '8px',
     cursor: 'pointer',
     textAlign: 'left',
+    boxSizing: 'border-box',
+    width: '100%',
   },
   atencaoPonto: {
     width: '6px',
@@ -844,12 +912,14 @@ const styles: Record<string, CSSProperties> = {
     border: '1px solid #fee2e2',
     padding: '10px 14px',
     borderRadius: '8px',
+    boxSizing: 'border-box',
+    width: '100%',
   },
   botaoAcaoLinha: {
     background: '#ffffff',
     border: '1px solid #fca5a5',
     color: '#b91c1c',
-    padding: '4px 10px',
+    padding: '6px 12px',
     borderRadius: '6px',
     fontWeight: 700,
     fontSize: '11px',
@@ -868,6 +938,7 @@ const styles: Record<string, CSSProperties> = {
     display: 'grid',
     placeItems: 'center',
     gap: '4px',
+    boxSizing: 'border-box',
   },
   statusResumoNumero: {
     fontSize: '24px',
@@ -889,6 +960,8 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    boxSizing: 'border-box',
+    gap: '8px',
   },
   listaRanking: {
     display: 'grid',
@@ -904,6 +977,7 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: '8px',
     padding: '8px 12px',
     fontSize: '13px',
+    boxSizing: 'border-box',
   },
   medalhaRank: {
     width: '20px',
