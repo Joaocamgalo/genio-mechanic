@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useRef,
   useState,
   type CSSProperties,
   type FormEvent,
@@ -71,7 +72,8 @@ export default function App() {
     return 'login';
   });
 
-  // Filtros de Chamados
+  // Filtros e Modo de Visualização de Chamados
+  const [modoVisualizacao, setModoVisualizacao] = useState<'lista' | 'kanban'>('kanban');
   const [filtroChamados, setFiltroChamados] = useState<FiltroChamado>('Todos');
   const [buscaChamados, setBuscaChamados] = useState('');
   const [filtroPrioridadeChamados, setFiltroPrioridadeChamados] = useState('');
@@ -91,7 +93,7 @@ export default function App() {
   // Modal de Histórico Técnico da Máquina
   const [maquinaHistoricoModal, setMaquinaHistoricoModal] = useState<PreventivaMaquina | null>(null);
 
-  // Estados dos Checkboxes de Revisão
+  // Estados dos Checkboxes de Revisão Preventiva
   const [itensRevisao, setItensRevisao] = useState({
     filtroCombustivel: false,
     filtroCombustivelSeparador: false,
@@ -105,6 +107,9 @@ export default function App() {
   const [litrosOleoHidraulico, setLitrosOleoHidraulico] = useState('');
   const [litrosOleoMotor, setLitrosOleoMotor] = useState('');
 
+  // Finalização e Assinatura Digital de Chamados
+  const [chamadoParaFinalizar, setChamadoParaFinalizar] = useState<Chamado | null>(null);
+  const [assinaturaDataUrl, setAssinaturaDataUrl] = useState<string>('');
   const [chamadoDetalhes, setChamadoDetalhes] = useState<Chamado | null>(null);
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -409,16 +414,179 @@ export default function App() {
         border: 2px solid #ffffff;
       }
 
+      /* Estilos do Kanban */
+      .kanban-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(280px, 1fr));
+        gap: 16px;
+        align-items: start;
+        overflow-x: auto;
+        padding-bottom: 12px;
+      }
+      .kanban-coluna {
+        background: #f1f5f9;
+        border-radius: 12px;
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-height: 480px;
+      }
+      .kanban-coluna-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e2e8f0;
+      }
+
       @media (max-width: 1024px) {
         .controlmaq-desktop-sidebar { transform: translateX(-100%); }
         .controlmaq-sidebar-open { transform: translateX(0) !important; }
         .controlmaq-main { margin-left: 0 !important; width: 100% !important; padding: 80px 14px 40px !important; }
         .controlmaq-topbar { left: 0 !important; }
+        .kanban-grid { grid-template-columns: repeat(3, 300px); }
       }
     `;
     document.head.appendChild(style);
   }
 
+  // GERADOR OFICIAL DE PDF DA ORDEM DE SERVIÇO COM ASSINATURA DIGITAL
+  function gerarPdfChamado(chamado: Chamado) {
+    const janela = window.open('', '_blank');
+    if (!janela) {
+      alert('O navegador bloqueou a abertura do PDF. Permita pop-ups para este site.');
+      return;
+    }
+
+    const dataAbertura = chamado.created_at ? new Date(chamado.created_at).toLocaleString('pt-BR') : 'Não informado';
+    const dataConclusao = chamado.finalizado_at ? new Date(chamado.finalizado_at).toLocaleString('pt-BR') : 'Em andamento';
+    const assinaturaSalva = localStorage.getItem(`controlmaq_assinatura_${chamado.id}`) || '';
+
+    janela.document.open();
+    janela.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Ordem de Serviço #${chamado.id} - ${chamado.maquina}</title>
+          <meta charset="UTF-8" />
+          <style>
+            * { box-sizing: border-box; }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; margin: 0; color: #0f172a; background: #fff; padding: 15mm; }
+            .pagina { width: 100%; max-width: 210mm; margin: 0 auto; }
+            .cabecalho { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 15px; margin-bottom: 20px; }
+            .logo-empresa { font-size: 24px; font-weight: 900; color: #0f172a; }
+            .logo-sub { font-size: 12px; color: #f59e0b; font-weight: 800; letter-spacing: 1px; }
+            .titulo-doc { text-align: right; }
+            .titulo-doc h2 { margin: 0; font-size: 18px; color: #0f172a; text-transform: uppercase; }
+            .titulo-doc span { font-size: 12px; color: #64748b; }
+            .bloco-dados { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 20px; }
+            .dado-item small { display: block; font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase; }
+            .dado-item strong { font-size: 14px; color: #0f172a; }
+            .secao-titulo { font-size: 13px; font-weight: 800; text-transform: uppercase; color: #0f172a; border-left: 4px solid #f59e0b; padding-left: 8px; margin: 18px 0 8px; }
+            .conteudo-caixa { border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; font-size: 13px; line-height: 1.5; background: #ffffff; }
+            .assinaturas { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px; }
+            .linha-assinatura { border-top: 1px solid #94a3b8; text-align: center; padding-top: 8px; font-size: 12px; color: #475569; }
+            .linha-assinatura strong { display: block; color: #0f172a; font-size: 13px; }
+            .box-assinatura-digital { height: 75px; display: flex; align-items: flex-end; justify-content: center; margin-bottom: 6px; }
+            .img-assinatura { max-height: 70px; max-width: 220px; object-fit: contain; }
+            @media print { body { padding: 0; } @page { margin: 15mm; } }
+          </style>
+        </head>
+        <body>
+          <div class="pagina">
+            <header class="cabecalho">
+              <div>
+                <div class="logo-empresa">LOKMAX</div>
+                <div class="logo-sub">GESTÃO TÉCNICA DE FROTAS</div>
+              </div>
+              <div class="titulo-doc">
+                <h2>Ordem de Serviço #${chamado.id}</h2>
+                <span>Situação: <strong>${chamado.status.toUpperCase()}</strong></span>
+              </div>
+            </header>
+
+            <div class="bloco-dados">
+              <div class="dado-item">
+                <small>Equipamento (TAG)</small>
+                <strong>${chamado.maquina}</strong>
+              </div>
+              <div class="dado-item">
+                <small>Cliente</small>
+                <strong>${chamado.cliente || 'Não informado'}</strong>
+              </div>
+              <div class="dado-item">
+                <small>Abertura do Chamado</small>
+                <strong>${dataAbertura}</strong>
+              </div>
+              <div class="dado-item">
+                <small>Conclusão</small>
+                <strong>${dataConclusao}</strong>
+              </div>
+            </div>
+
+            <div class="bloco-dados" style="margin-top: -10px;">
+              <div class="dado-item">
+                <small>Solicitante</small>
+                <strong>${chamado.solicitante}</strong>
+              </div>
+              <div class="dado-item">
+                <small>Telefone de Contato</small>
+                <strong>${chamado.telefone || 'Não informado'}</strong>
+              </div>
+              <div class="dado-item">
+                <small>Local do Atendimento</small>
+                <strong>${chamado.local}</strong>
+              </div>
+              <div class="dado-item">
+                <small>Mecânico Responsável</small>
+                <strong>${chamado.mecanico || 'Não designado'}</strong>
+              </div>
+            </div>
+
+            <div class="secao-titulo">Anomalia / Problema Relatado</div>
+            <div class="conteudo-caixa">
+              ${chamado.problema}
+            </div>
+
+            <div class="secao-titulo">Diagnóstico Técnico da Falha</div>
+            <div class="conteudo-caixa">
+              ${chamado.diagnostico_tecnico || 'Diagnóstico em elaboração ou pendente.'}
+            </div>
+
+            <div class="secao-titulo">Serviço e Reparos Concluídos</div>
+            <div class="conteudo-caixa">
+              ${chamado.solucao || 'Serviço em execução.'}
+            </div>
+
+            <div class="assinaturas">
+              <div>
+                <div class="box-assinatura-digital">
+                  ${assinaturaSalva ? `<img src="${assinaturaSalva}" class="img-assinatura" alt="Assinatura Digital" />` : ''}
+                </div>
+                <div class="linha-assinatura">
+                  <strong>${chamado.mecanico || 'Técnico Especialista'}</strong>
+                  Responsável Técnico da Execução
+                </div>
+              </div>
+
+              <div>
+                <div class="box-assinatura-digital"></div>
+                <div class="linha-assinatura">
+                  <strong>${chamado.solicitante || 'Responsável no Local'}</strong>
+                  Aprovação / Visto do Cliente
+                </div>
+              </div>
+            </div>
+          </div>
+          <script>window.onload = function() { window.print(); };</script>
+        </body>
+      </html>
+    `);
+    janela.document.close();
+  }
+
+  // GERADOR OFICIAL DE PDF DA REVISÃO PREVENTIVA
   function gerarPdfPreventiva(
     maquina: { tag: string; marca: string; modelo: string },
     revisao: {
@@ -553,6 +721,203 @@ export default function App() {
       salvarLoginLocal(usuarioEncontrado);
       setTela(usuarioEncontrado.tipo === 'operador' ? 'operacaoDiaria' : 'dashboard');
       await carregarDados(false);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  // EXCLUSÃO / LIMPEZA DE ORDEM DE SERVIÇO COM CONFIRMAÇÃO
+  async function excluirChamado(chamadoAlvo: Chamado) {
+    const confirmar = confirm(
+      `⚠️ ATENÇÃO: Confirma a exclusão da Ordem de Serviço #${chamadoAlvo.id}?\n\nMáquina: ${chamadoAlvo.maquina}\nProblema: ${chamadoAlvo.problema}\n\nEsta ação limpará o chamado do banco de dados definitivamente.`
+    );
+
+    if (!confirmar) return;
+
+    try {
+      setSalvando(true);
+
+      // Limpa os registros de histórico vinculados para evitar violação de integridade
+      await supabase
+        .from('historico_chamados')
+        .delete()
+        .eq('chamado_id', chamadoAlvo.id);
+
+      const { error } = await supabase
+        .from('chamados')
+        .delete()
+        .eq('id', chamadoAlvo.id);
+
+      if (error) {
+        alert('Erro ao excluir a Ordem de Serviço.');
+        return;
+      }
+
+      // Remove a assinatura local salva, se houver
+      localStorage.removeItem(`controlmaq_assinatura_${chamadoAlvo.id}`);
+
+      setChamados((prev) => prev.filter((c) => c.id !== chamadoAlvo.id));
+      alert(`Ordem de Serviço #${chamadoAlvo.id} excluída com sucesso!`);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  // CRIAÇÃO DE NOVA ORDEM DE SERVIÇO
+  async function criarChamado(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!usuarioLogado) return;
+
+    const form = new FormData(event.currentTarget);
+    const maquina = String(form.get('maquina') || '').trim();
+    const cliente = String(form.get('cliente') || '').trim();
+    const solicitante = String(form.get('solicitante') || '').trim();
+    const telefone = String(form.get('telefone') || '').trim();
+    const local = String(form.get('local') || '').trim();
+    const problema = String(form.get('problema') || '').trim();
+    const prioridade = String(form.get('prioridade') || 'Média') as Chamado['prioridade'];
+
+    if (!maquina || !solicitante || !local || !problema) {
+      alert('Preencha os campos obrigatórios: Máquina, Solicitante, Local e Problema.');
+      return;
+    }
+
+    try {
+      setSalvando(true);
+      const { data, error } = await supabase
+        .from('chamados')
+        .insert({
+          maquina,
+          cliente: cliente || null,
+          solicitante,
+          telefone: telefone || null,
+          local,
+          problema,
+          prioridade,
+          status: 'Aberto',
+          criado_por: usuarioLogado.nome,
+        })
+        .select()
+        .single();
+
+      if (error || !data) {
+        alert('Erro ao registar a Ordem de Serviço.');
+        return;
+      }
+
+      setChamados((prev) => [data as Chamado, ...prev]);
+      setMaquinaNovoChamado('');
+      setFiltroChamados('Aberto');
+      setTela('chamados');
+      alert(`Ordem de Serviço #${(data as Chamado).id} aberta com sucesso!`);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function assumirChamado(id: number) {
+    if (!usuarioLogado) return;
+    const chamadoAtual = chamados.find((c) => c.id === id);
+    if (!chamadoAtual || chamadoAtual.status !== 'Aberto') return;
+
+    let mecanicoResponsavel = usuarioLogado.nome;
+
+    if (usuarioLogado.tipo === 'admin') {
+      const mecanicos = usuarios.filter((u) => u.tipo === 'mecanico');
+      const nomeInformado = prompt(
+        `Digite o nome do mecânico responsável:\n\n${mecanicos.map((m) => m.nome).join(', ')}`
+      );
+      if (!nomeInformado) return;
+      mecanicoResponsavel = nomeInformado.trim();
+    }
+
+    try {
+      setSalvando(true);
+      const agora = new Date().toISOString();
+      const { data, error } = await supabase
+        .from('chamados')
+        .update({
+          status: 'Assumido',
+          mecanico: mecanicoResponsavel,
+          iniciado_at: agora,
+        })
+        .eq('id', id)
+        .eq('status', 'Aberto')
+        .select()
+        .single();
+
+      if (!error && data) {
+        setChamados((prev) => prev.map((c) => (c.id === id ? (data as Chamado) : c)));
+        setFiltroChamados('Assumido');
+        alert(`Chamado #${id} assumido com sucesso por ${mecanicoResponsavel}!`);
+      }
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  function abrirTelaFinalizar(id: number) {
+    const chamado = chamados.find((c) => c.id === id);
+    if (chamado) {
+      setChamadoParaFinalizar(chamado);
+      setAssinaturaDataUrl('');
+      setTela('finalizarChamado');
+    }
+  }
+
+  async function concluirFinalizacao(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!usuarioLogado || !chamadoParaFinalizar) return;
+
+    const form = new FormData(event.currentTarget);
+    const diagnostico = String(form.get('diagnosticoTecnico') || '').trim();
+    const solucao = String(form.get('solucao') || '').trim();
+    const maquinaLiberada = form.get('maquinaLiberada') === 'sim';
+    const necessitaRetorno = form.get('necessitaRetorno') === 'sim';
+
+    if (!diagnostico || !solucao) {
+      alert('Preencha o diagnóstico e o serviço realizado.');
+      return;
+    }
+
+    try {
+      setSalvando(true);
+      const agora = new Date().toISOString();
+      const { data, error } = await supabase
+        .from('chamados')
+        .update({
+          status: 'Finalizado',
+          diagnostico_tecnico: diagnostico,
+          solucao,
+          maquina_liberada: maquinaLiberada,
+          necessita_retorno: necessitaRetorno,
+          finalizado_por: usuarioLogado.nome,
+          finalizado_at: agora,
+        })
+        .eq('id', chamadoParaFinalizar.id)
+        .select()
+        .single();
+
+      if (!error && data) {
+        const chamadoSalvo = data as Chamado;
+
+        if (assinaturaDataUrl) {
+          localStorage.setItem(`controlmaq_assinatura_${chamadoSalvo.id}`, assinaturaDataUrl);
+        }
+
+        setChamados((prev) =>
+          prev.map((c) => (c.id === chamadoParaFinalizar.id ? chamadoSalvo : c))
+        );
+
+        setChamadoParaFinalizar(null);
+        setFiltroChamados('Finalizado');
+        setTela('chamados');
+
+        const desejaImprimir = confirm('Ordem de Serviço finalizada com sucesso!\n\nDeseja gerar o relatório em PDF com a assinatura digital agora?');
+        if (desejaImprimir) {
+          gerarPdfChamado(chamadoSalvo);
+        }
+      }
     } finally {
       setSalvando(false);
     }
@@ -977,7 +1342,102 @@ export default function App() {
           </div>
         )}
 
-        {/* TELA 3: PLANO PREVENTIVO */}
+        {/* TELA 3: ABRIR NOVA ORDEM DE SERVIÇO */}
+        {tela === 'novoChamado' && (
+          <div style={estilos.cardFormulario}>
+            <button onClick={() => setTela('chamados')} style={estilos.botaoVoltar}>
+              ← Cancelar
+            </button>
+            <h2 style={{ margin: '8px 0 6px', fontSize: '22px' }}>Abrir Nova Ordem de Serviço</h2>
+            <p style={{ color: '#64748b', fontSize: '13px', margin: '0 0 20px' }}>
+              Registe a solicitação de manutenção para atendimento em campo ou oficina.
+            </p>
+
+            <form onSubmit={criarChamado}>
+              <label style={estilos.label}>Máquina / Equipamento *</label>
+              <select
+                name="maquina"
+                style={estilos.input}
+                value={maquinaNovoChamado}
+                onChange={(e) => setMaquinaNovoChamado(e.target.value)}
+                required
+              >
+                <option value="">Selecione a máquina</option>
+                {maquinas.map((m) => (
+                  <option key={m.id} value={m.tag}>
+                    {m.tag} — {m.marca} {m.modelo}
+                  </option>
+                ))}
+              </select>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={estilos.label}>Cliente</label>
+                  <input
+                    name="cliente"
+                    placeholder="Empresa ou cliente da locação"
+                    style={estilos.input}
+                  />
+                </div>
+                <div>
+                  <label style={estilos.label}>Solicitante *</label>
+                  <input
+                    name="solicitante"
+                    placeholder="Nome de quem solicitou"
+                    style={estilos.input}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={estilos.label}>Telefone de Contato</label>
+                  <input
+                    name="telefone"
+                    placeholder="(xx) xxxxx-xxxx"
+                    style={estilos.input}
+                  />
+                </div>
+                <div>
+                  <label style={estilos.label}>Prioridade</label>
+                  <select name="prioridade" style={estilos.input} defaultValue="Média">
+                    <option value="Baixa">Baixa</option>
+                    <option value="Média">Média</option>
+                    <option value="Alta">Alta</option>
+                    <option value="Urgente">Urgente</option>
+                  </select>
+                </div>
+              </div>
+
+              <label style={estilos.label}>Local do Atendimento / Obra *</label>
+              <input
+                name="local"
+                placeholder="Ex: Obra Vale Nova Lima, Pátio Central..."
+                style={estilos.input}
+                required
+              />
+
+              <label style={estilos.label}>Problema / Anomalia Relatada *</label>
+              <textarea
+                name="problema"
+                placeholder="Descreva detalhadamente o sintoma apresentado pela máquina..."
+                style={estilos.textarea}
+                required
+              />
+
+              <button
+                type="submit"
+                style={{ ...estilos.botaoNovoSubmit, marginTop: '20px' }}
+                disabled={salvando}
+              >
+                {salvando ? 'A registar...' : 'Confirmar e Abrir Ordem de Serviço'}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* TELA 4: PLANO PREVENTIVO */}
         {tela === 'preventivas' && (
           <div>
             <div style={estilos.cabecalhoPagina}>
@@ -1103,7 +1563,7 @@ export default function App() {
           </div>
         )}
 
-        {/* TELA 4: HORÍMETROS */}
+        {/* TELA 5: HORÍMETROS */}
         {tela === 'horimetros' && (
           <div>
             <div style={estilos.cabecalhoPagina}>
@@ -1135,6 +1595,480 @@ export default function App() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* TELA 6: ORDENS DE SERVIÇO (MODO LISTA & KANBAN) */}
+        {tela === 'chamados' && (
+          <div>
+            <div style={estilos.cabecalhoPagina}>
+              <div>
+                <span style={estilos.preTitulo}>Operações Ativas</span>
+                <h2 style={estilos.tituloSecao}>Quadro de Ordens de Serviço</h2>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                {/* Alternador de Visualização (Lista vs Kanban) */}
+                <div style={{ display: 'flex', background: '#e2e8f0', padding: '3px', borderRadius: '8px' }}>
+                  <button
+                    onClick={() => setModoVisualizacao('lista')}
+                    style={{
+                      border: 0,
+                      padding: '7px 14px',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      background: modoVisualizacao === 'lista' ? '#ffffff' : 'transparent',
+                      color: modoVisualizacao === 'lista' ? '#0f172a' : '#64748b',
+                    }}
+                  >
+                    📋 Lista
+                  </button>
+                  <button
+                    onClick={() => setModoVisualizacao('kanban')}
+                    style={{
+                      border: 0,
+                      padding: '7px 14px',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      background: modoVisualizacao === 'kanban' ? '#ffffff' : 'transparent',
+                      color: modoVisualizacao === 'kanban' ? '#0f172a' : '#64748b',
+                    }}
+                  >
+                    📊 Quadro Kanban
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setMaquinaNovoChamado('');
+                    setTela('novoChamado');
+                  }}
+                  style={estilos.botaoNovo}
+                >
+                  + Abrir Nova OS
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+              <input
+                value={buscaChamados}
+                onChange={(e) => setBuscaChamados(e.target.value)}
+                placeholder="Pesquisar por TAG da máquina, cliente, falha ou mecânico..."
+                style={estilos.inputBusca}
+              />
+            </div>
+
+            {/* MODO 1: VISUALIZAÇÃO EM LISTA */}
+            {modoVisualizacao === 'lista' && (
+              <>
+                <div style={estilos.filtros}>
+                  <button
+                    onClick={() => setFiltroChamados('Todos')}
+                    style={{ ...estilos.botaoFiltro, background: filtroChamados === 'Todos' ? '#0f172a' : '#fff', color: filtroChamados === 'Todos' ? '#fff' : '#475569' }}
+                  >
+                    Todos ({chamadosVisiveis.length})
+                  </button>
+                  <button
+                    onClick={() => setFiltroChamados('Aberto')}
+                    style={{ ...estilos.botaoFiltro, background: filtroChamados === 'Aberto' ? '#dc2626' : '#fff', color: filtroChamados === 'Aberto' ? '#fff' : '#475569' }}
+                  >
+                    Abertos ({chamadosAbertos.length})
+                  </button>
+                  <button
+                    onClick={() => setFiltroChamados('Assumido')}
+                    style={{ ...estilos.botaoFiltro, background: filtroChamados === 'Assumido' ? '#2563eb' : '#fff', color: filtroChamados === 'Assumido' ? '#fff' : '#475569' }}
+                  >
+                    Em Andamento ({chamadosAssumidos.length})
+                  </button>
+                  <button
+                    onClick={() => setFiltroChamados('Finalizado')}
+                    style={{ ...estilos.botaoFiltro, background: filtroChamados === 'Finalizado' ? '#16a34a' : '#fff', color: filtroChamados === 'Finalizado' ? '#fff' : '#475569' }}
+                  >
+                    Concluídos ({chamadosFinalizados.length})
+                  </button>
+                </div>
+
+                <div style={estilos.listaMaquinas}>
+                  {chamadosFiltrados.length === 0 ? (
+                    <div style={{ ...estilos.cardFormulario, textAlign: 'center', gridColumn: '1 / -1' }}>
+                      <p style={{ color: '#64748b' }}>Nenhuma ordem de serviço localizada com estes filtros.</p>
+                    </div>
+                  ) : (
+                    chamadosFiltrados.map((chamado) => (
+                      <div key={chamado.id} className="cm-card" style={estilos.cardMaquinaNovo}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <strong style={{ fontSize: '16px' }}>{chamado.maquina}</strong>
+                            <span style={{ fontSize: '12px', color: '#94a3b8' }}>#{chamado.id}</span>
+                          </div>
+                          <span className={`cm-badge badge-${chamado.status.toLowerCase()}`}>{chamado.status}</span>
+                        </div>
+
+                        <p style={{ margin: '0 0 10px', fontSize: '14px', color: '#334155', lineHeight: 1.4 }}>
+                          {chamado.problema}
+                        </p>
+
+                        <div style={{ fontSize: '12px', color: '#64748b', display: 'grid', gap: '3px', marginBottom: '14px' }}>
+                          <div>📍 Local: {chamado.local}</div>
+                          <div>👤 Solicitante: <strong>{chamado.solicitante}</strong></div>
+                          <div>🔧 Mecânico: <strong>{chamado.mecanico || 'Aguardando atribuição'}</strong></div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '6px', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                          <button
+                            onClick={() => {
+                              setChamadoDetalhes(chamado);
+                              setTela('detalhesChamado');
+                            }}
+                            style={estilos.botaoAjustarHorimetro}
+                          >
+                            Detalhes
+                          </button>
+
+                          {chamado.status === 'Aberto' && (
+                            <button
+                              onClick={() => assumirChamado(chamado.id)}
+                              style={estilos.botaoCardPrincipal}
+                            >
+                              Assumir OS
+                            </button>
+                          )}
+
+                          {chamado.status === 'Assumido' && (
+                            <button
+                              onClick={() => abrirTelaFinalizar(chamado.id)}
+                              style={{ ...estilos.botaoCardPrincipal, background: '#16a34a' }}
+                            >
+                              Concluir OS
+                            </button>
+                          )}
+
+                          {chamado.status === 'Finalizado' && (
+                            <button
+                              onClick={() => gerarPdfChamado(chamado)}
+                              style={{ ...estilos.botaoCardPrincipal, background: '#0f172a' }}
+                            >
+                              📄 PDF
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() => excluirChamado(chamado)}
+                            title="Excluir Ordem de Serviço"
+                            style={estilos.botaoExcluirOS}
+                          >
+                            🗑
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* MODO 2: VISUALIZAÇÃO EM QUADRO KANBAN */}
+            {modoVisualizacao === 'kanban' && (
+              <div className="kanban-grid">
+                {/* COLUNA 1: ABERTOS */}
+                <div className="kanban-coluna">
+                  <div className="kanban-coluna-header">
+                    <strong style={{ color: '#dc2626', fontSize: '14px' }}>🔴 Abertos / Pendentes</strong>
+                    <span style={estilos.badgeContador}>{chamadosAbertos.length}</span>
+                  </div>
+
+                  {chamadosAbertos.length === 0 ? (
+                    <p style={estilos.textoVazioKanban}>Nenhum chamado aberto</p>
+                  ) : (
+                    chamadosAbertos.map((c) => (
+                      <div key={c.id} className="cm-card" style={estilos.cardKanbanItem}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                          <strong>{c.maquina}</strong>
+                          <span style={{ fontSize: '11px', color: '#94a3b8' }}>#{c.id}</span>
+                        </div>
+                        <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#334155', lineHeight: 1.3 }}>
+                          {c.problema}
+                        </p>
+                        <small style={{ color: '#64748b', display: 'block', marginBottom: '10px' }}>
+                          📍 {c.local}
+                        </small>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            onClick={() => assumirChamado(c.id)}
+                            style={{ ...estilos.botaoCardPrincipal, padding: '6px 8px', fontSize: '11px' }}
+                          >
+                            Assumir
+                          </button>
+                          <button
+                            onClick={() => {
+                              setChamadoDetalhes(c);
+                              setTela('detalhesChamado');
+                            }}
+                            style={{ ...estilos.botaoAjustarHorimetro, padding: '6px 8px', fontSize: '11px' }}
+                          >
+                            Ver
+                          </button>
+                          <button
+                            onClick={() => excluirChamado(c)}
+                            title="Excluir Chamado"
+                            style={estilos.botaoExcluirOS}
+                          >
+                            🗑
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* COLUNA 2: EM ATENDIMENTO */}
+                <div className="kanban-coluna">
+                  <div className="kanban-coluna-header">
+                    <strong style={{ color: '#d97706', fontSize: '14px' }}>🟡 Em Atendimento</strong>
+                    <span style={estilos.badgeContador}>{chamadosAssumidos.length}</span>
+                  </div>
+
+                  {chamadosAssumidos.length === 0 ? (
+                    <p style={estilos.textoVazioKanban}>Nenhum chamado em execução</p>
+                  ) : (
+                    chamadosAssumidos.map((c) => (
+                      <div key={c.id} className="cm-card" style={estilos.cardKanbanItem}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                          <strong>{c.maquina}</strong>
+                          <span style={{ fontSize: '11px', color: '#94a3b8' }}>#{c.id}</span>
+                        </div>
+                        <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#334155', lineHeight: 1.3 }}>
+                          {c.problema}
+                        </p>
+                        <small style={{ color: '#0f172a', fontWeight: 600, display: 'block', marginBottom: '10px' }}>
+                          🔧 Técnico: {c.mecanico}
+                        </small>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            onClick={() => abrirTelaFinalizar(c.id)}
+                            style={{ ...estilos.botaoCardPrincipal, background: '#16a34a', padding: '6px 8px', fontSize: '11px' }}
+                          >
+                            ✓ Concluir
+                          </button>
+                          <button
+                            onClick={() => {
+                              setChamadoDetalhes(c);
+                              setTela('detalhesChamado');
+                            }}
+                            style={{ ...estilos.botaoAjustarHorimetro, padding: '6px 8px', fontSize: '11px' }}
+                          >
+                            Ver
+                          </button>
+                          <button
+                            onClick={() => excluirChamado(c)}
+                            title="Excluir Chamado"
+                            style={estilos.botaoExcluirOS}
+                          >
+                            🗑
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* COLUNA 3: CONCLUÍDOS */}
+                <div className="kanban-coluna">
+                  <div className="kanban-coluna-header">
+                    <strong style={{ color: '#16a34a', fontSize: '14px' }}>🟢 Concluídos</strong>
+                    <span style={estilos.badgeContador}>{chamadosFinalizados.length}</span>
+                  </div>
+
+                  {chamadosFinalizados.length === 0 ? (
+                    <p style={estilos.textoVazioKanban}>Nenhum chamado finalizado</p>
+                  ) : (
+                    chamadosFinalizados.map((c) => (
+                      <div key={c.id} className="cm-card" style={estilos.cardKanbanItem}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                          <strong>{c.maquina}</strong>
+                          <span style={{ fontSize: '11px', color: '#94a3b8' }}>#{c.id}</span>
+                        </div>
+                        <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#334155', lineHeight: 1.3 }}>
+                          {c.problema}
+                        </p>
+                        <div style={{ fontSize: '11px', color: '#16a34a', fontWeight: 700, marginBottom: '10px' }}>
+                          ✓ Concluído por: {c.mecanico || c.finalizado_por}
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            onClick={() => gerarPdfChamado(c)}
+                            style={{ ...estilos.botaoCardPrincipal, background: '#0f172a', padding: '6px 8px', fontSize: '11px' }}
+                          >
+                            📄 PDF
+                          </button>
+                          <button
+                            onClick={() => {
+                              setChamadoDetalhes(c);
+                              setTela('detalhesChamado');
+                            }}
+                            style={{ ...estilos.botaoAjustarHorimetro, padding: '6px 8px', fontSize: '11px' }}
+                          >
+                            Ver
+                          </button>
+                          <button
+                            onClick={() => excluirChamado(c)}
+                            title="Excluir Chamado"
+                            style={estilos.botaoExcluirOS}
+                          >
+                            🗑
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TELA 7: DETALHES DE CHAMADO */}
+        {tela === 'detalhesChamado' && chamadoDetalhes && (
+          <div style={estilos.cardFormulario}>
+            <button onClick={() => setTela('chamados')} style={estilos.botaoVoltar}>
+              ← Voltar ao Quadro
+            </button>
+            <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', marginBottom: '18px' }}>
+              <span className={`cm-badge badge-${chamadoDetalhes.status.toLowerCase()}`}>
+                {chamadoDetalhes.status}
+              </span>
+              <h2 style={{ margin: '6px 0 0', fontSize: '22px' }}>
+                Ordem de Serviço #{chamadoDetalhes.id} — {chamadoDetalhes.maquina}
+              </h2>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '18px', fontSize: '14px' }}>
+              <div><strong>Cliente:</strong> {chamadoDetalhes.cliente || 'Não especificado'}</div>
+              <div><strong>Solicitante:</strong> {chamadoDetalhes.solicitante}</div>
+              <div><strong>Telefone:</strong> {chamadoDetalhes.telefone || 'Não informado'}</div>
+              <div><strong>Local:</strong> {chamadoDetalhes.local}</div>
+              <div><strong>Mecânico:</strong> {chamadoDetalhes.mecanico || 'Pendente'}</div>
+              <div><strong>Prioridade:</strong> {chamadoDetalhes.prioridade}</div>
+            </div>
+
+            <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '10px', marginBottom: '14px' }}>
+              <strong style={{ display: 'block', fontSize: '12px', color: '#64748b', textTransform: 'uppercase' }}>Problema Relatado</strong>
+              <p style={{ margin: '4px 0 0', lineHeight: 1.5 }}>{chamadoDetalhes.problema}</p>
+            </div>
+
+            {chamadoDetalhes.diagnostico_tecnico && (
+              <div style={{ background: '#f1f5f9', padding: '14px', borderRadius: '10px', marginBottom: '14px' }}>
+                <strong style={{ display: 'block', fontSize: '12px', color: '#475569', textTransform: 'uppercase' }}>Diagnóstico Técnico</strong>
+                <p style={{ margin: '4px 0 0', lineHeight: 1.5 }}>{chamadoDetalhes.diagnostico_tecnico}</p>
+              </div>
+            )}
+
+            {chamadoDetalhes.solucao && (
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '14px', borderRadius: '10px', marginBottom: '18px' }}>
+                <strong style={{ display: 'block', fontSize: '12px', color: '#166534', textTransform: 'uppercase' }}>Serviço Executado</strong>
+                <p style={{ margin: '4px 0 0', lineHeight: 1.5, color: '#14532d' }}>{chamadoDetalhes.solucao}</p>
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '10px' }}>
+              <button
+                onClick={() => gerarPdfChamado(chamadoDetalhes)}
+                style={estilos.botaoNovoSubmit}
+              >
+                📄 Imprimir Ordem de Serviço (PDF)
+              </button>
+
+              {chamadoDetalhes.status === 'Assumido' && (
+                <button
+                  onClick={() => abrirTelaFinalizar(chamadoDetalhes.id)}
+                  style={{ ...estilos.botaoNovoSubmit, background: '#16a34a', color: '#fff' }}
+                >
+                  Concluir Atendimento
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  excluirChamado(chamadoDetalhes);
+                  setTela('chamados');
+                }}
+                style={{ ...estilos.botaoExcluirOS, padding: '10px 14px' }}
+                title="Excluir Chamado"
+              >
+                🗑
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* TELA 8: FINALIZAR CHAMADO COM ASSINATURA DIGITAL */}
+        {tela === 'finalizarChamado' && chamadoParaFinalizar && (
+          <div style={{ ...estilos.cardFormulario, maxWidth: '680px' }}>
+            <button onClick={() => setTela('chamados')} style={estilos.botaoVoltar}>
+              ← Cancelar
+            </button>
+            <h2 style={{ margin: '8px 0 4px', fontSize: '22px' }}>
+              Concluir OS #{chamadoParaFinalizar.id} — {chamadoParaFinalizar.maquina}
+            </h2>
+            <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '18px' }}>
+              Preencha os pareceres técnicos e colha a assinatura digital para fechar o atendimento.
+            </p>
+
+            <form onSubmit={concluirFinalizacao}>
+              <label style={estilos.label}>Diagnóstico Técnico do Problema *</label>
+              <textarea
+                name="diagnosticoTecnico"
+                placeholder="Descreva a causa raiz identificada no equipamento..."
+                style={estilos.textarea}
+                required
+              />
+
+              <label style={estilos.label}>Serviço e Reparos Concluídos *</label>
+              <textarea
+                name="solucao"
+                placeholder="Peças trocadas, regulagens efetuadas ou serviços executados..."
+                style={estilos.textarea}
+                required
+              />
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', margin: '14px 0' }}>
+                <div>
+                  <label style={estilos.label}>Equipamento Liberado?</label>
+                  <select name="maquinaLiberada" style={estilos.input} defaultValue="sim">
+                    <option value="sim">Sim, totalmente operacional</option>
+                    <option value="nao">Não, necessita bloqueio</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={estilos.label}>Necessita Retorno Técnico?</label>
+                  <select name="necessitaRetorno" style={estilos.input} defaultValue="nao">
+                    <option value="nao">Não, caso concluído</option>
+                    <option value="sim">Sim, aguarda sobressalente</option>
+                  </select>
+                </div>
+              </div>
+
+              <label style={{ ...estilos.label, marginTop: '16px' }}>
+                Assinatura Digital do Técnico / Responsável
+              </label>
+              <p style={{ color: '#64748b', fontSize: '12px', margin: '0 0 8px' }}>
+                Desenhe a assinatura no quadro abaixo usando o dedo ou mouse:
+              </p>
+
+              <QuadroAssinaturaDigital onChange={(dataUrl) => setAssinaturaDataUrl(dataUrl)} />
+
+              <button
+                type="submit"
+                style={{ ...estilos.botaoNovoSubmit, background: '#16a34a', color: '#fff', marginTop: '20px' }}
+                disabled={salvando}
+              >
+                {salvando ? 'Salvando...' : 'Concluir Chamado & Registrar Assinatura'}
+              </button>
+            </form>
           </div>
         )}
 
@@ -1276,7 +2210,7 @@ export default function App() {
           </div>
         )}
 
-        {/* MODAL: REGISTAR REVISÃO COM CHECKBOXES E LITROS */}
+        {/* MODAL: REGISTAR REVISÃO PREVENTIVA */}
         {modoPreventiva === 'registrar' && preventivaSelecionada && (
           <div style={estilos.modalOverlay}>
             <div style={{ ...estilos.modalCard, maxWidth: '640px', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -1465,90 +2399,120 @@ export default function App() {
             </div>
           </div>
         )}
-
-        {/* TELA DE CHAMADOS */}
-        {tela === 'chamados' && (
-          <div>
-            <div style={estilos.cabecalhoPagina}>
-              <div>
-                <span style={estilos.preTitulo}>Operações Ativas</span>
-                <h2 style={estilos.tituloSecao}>Quadro de Ordens de Serviço</h2>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
-              <input
-                value={buscaChamados}
-                onChange={(e) => setBuscaChamados(e.target.value)}
-                placeholder="Pesquisar por TAG da máquina, cliente, falha ou mecânico..."
-                style={estilos.inputBusca}
-              />
-            </div>
-
-            <div style={estilos.filtros}>
-              <button
-                onClick={() => setFiltroChamados('Todos')}
-                style={{ ...estilos.botaoFiltro, background: filtroChamados === 'Todos' ? '#0f172a' : '#fff', color: filtroChamados === 'Todos' ? '#fff' : '#475569' }}
-              >
-                Todos ({chamadosVisiveis.length})
-              </button>
-              <button
-                onClick={() => setFiltroChamados('Aberto')}
-                style={{ ...estilos.botaoFiltro, background: filtroChamados === 'Aberto' ? '#dc2626' : '#fff', color: filtroChamados === 'Aberto' ? '#fff' : '#475569' }}
-              >
-                Abertos ({chamadosAbertos.length})
-              </button>
-              <button
-                onClick={() => setFiltroChamados('Assumido')}
-                style={{ ...estilos.botaoFiltro, background: filtroChamados === 'Assumido' ? '#2563eb' : '#fff', color: filtroChamados === 'Assumido' ? '#fff' : '#475569' }}
-              >
-                Em Andamento ({chamadosAssumidos.length})
-              </button>
-              <button
-                onClick={() => setFiltroChamados('Finalizado')}
-                style={{ ...estilos.botaoFiltro, background: filtroChamados === 'Finalizado' ? '#16a34a' : '#fff', color: filtroChamados === 'Finalizado' ? '#fff' : '#475569' }}
-              >
-                Concluídos ({chamadosFinalizados.length})
-              </button>
-            </div>
-
-            <div style={estilos.listaMaquinas}>
-              {chamadosFiltrados.map((chamado) => (
-                <div key={chamado.id} className="cm-card" style={estilos.cardMaquinaNovo}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <strong>{chamado.maquina}</strong>
-                    <span className={`cm-badge badge-${chamado.status.toLowerCase()}`}>{chamado.status}</span>
-                  </div>
-                  <p style={{ margin: '0 0 10px', fontSize: '14px', color: '#334155' }}>{chamado.problema}</p>
-                  <button
-                    onClick={() => {
-                      setChamadoDetalhes(chamado);
-                      setTela('detalhesChamado');
-                    }}
-                    style={estilos.botaoCardPrincipal}
-                  >
-                    Ver Detalhes da OS
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* TELA DE DETALHES DE CHAMADO */}
-        {tela === 'detalhesChamado' && chamadoDetalhes && (
-          <div style={estilos.cardFormulario}>
-            <button onClick={() => setTela('chamados')} style={estilos.botaoVoltar}>
-              ← Voltar ao Quadro
-            </button>
-            <h2>Chamado #{chamadoDetalhes.id} — {chamadoDetalhes.maquina}</h2>
-            <p><strong>Status:</strong> {chamadoDetalhes.status}</p>
-            <p><strong>Problema:</strong> {chamadoDetalhes.problema}</p>
-            <p><strong>Local:</strong> {chamadoDetalhes.local}</p>
-            <p><strong>Técnico:</strong> {chamadoDetalhes.mecanico || 'Pendente'}</p>
-          </div>
-        )}
       </main>
+    </div>
+  );
+}
+
+// COMPONENTE TÁTIL DE ASSINATURA DIGITAL (CANVAS INTERATIVO)
+function QuadroAssinaturaDigital(props: { onChange: (dataUrl: string) => void }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [desenhando, setDesenhando] = useState(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+  }, []);
+
+  function getCoordenadas(e: React.MouseEvent | React.TouchEvent) {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    if ('touches' in e && e.touches.length > 0) {
+      return {
+        x: e.touches[0].clientX - rect.left,
+        y: e.touches[0].clientY - rect.top,
+      };
+    } else if ('clientX' in e) {
+      return {
+        x: (e as React.MouseEvent).clientX - rect.left,
+        y: (e as React.MouseEvent).clientY - rect.top,
+      };
+    }
+    return { x: 0, y: 0 };
+  }
+
+  function iniciarTraco(e: React.MouseEvent | React.TouchEvent) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    setDesenhando(true);
+    const { x, y } = getCoordenadas(e);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  }
+
+  function moverTraco(e: React.MouseEvent | React.TouchEvent) {
+    if (!desenhando) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const { x, y } = getCoordenadas(e);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  }
+
+  function finalizarTraco() {
+    if (!desenhando) return;
+    setDesenhando(false);
+    const canvas = canvasRef.current;
+    if (canvas) {
+      props.onChange(canvas.toDataURL('image/png'));
+    }
+  }
+
+  function limparCanvas() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    props.onChange('');
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: '8px' }}>
+      <div style={{ border: '2px dashed #cbd5e1', borderRadius: '10px', background: '#f8fafc', overflow: 'hidden' }}>
+        <canvas
+          ref={canvasRef}
+          width={580}
+          height={160}
+          onMouseDown={iniciarTraco}
+          onMouseMove={moverTraco}
+          onMouseUp={finalizarTraco}
+          onMouseLeave={finalizarTraco}
+          onTouchStart={iniciarTraco}
+          onTouchMove={moverTraco}
+          onTouchEnd={finalizarTraco}
+          style={{ width: '100%', height: '160px', display: 'block', touchAction: 'none', cursor: 'crosshair' }}
+        />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button
+          type="button"
+          onClick={limparCanvas}
+          style={{
+            background: '#ffffff',
+            border: '1px solid #cbd5e1',
+            borderRadius: '6px',
+            padding: '6px 12px',
+            fontSize: '12px',
+            fontWeight: 700,
+            cursor: 'pointer',
+            color: '#dc2626',
+          }}
+        >
+          Limpar Assinatura
+        </button>
+      </div>
     </div>
   );
 }
@@ -1715,6 +2679,16 @@ const estilos: Record<string, CSSProperties> = {
   cabecalhoPagina: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '20px' },
   preTitulo: { color: '#64748b', fontWeight: 800, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' },
   tituloSecao: { margin: '2px 0 0', fontSize: '24px', fontWeight: 800, color: '#0f172a' },
+  botaoNovo: {
+    background: '#f59e0b',
+    color: '#000',
+    border: 0,
+    padding: '10px 18px',
+    borderRadius: '8px',
+    fontWeight: 800,
+    fontSize: '13px',
+    cursor: 'pointer',
+  },
   filtros: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
   botaoFiltro: {
     padding: '8px 14px',
@@ -1790,6 +2764,35 @@ const estilos: Record<string, CSSProperties> = {
     fontWeight: 700,
     fontSize: '12px',
     cursor: 'pointer',
+  },
+  botaoExcluirOS: {
+    background: '#fee2e2',
+    border: '1px solid #fecaca',
+    color: '#dc2626',
+    borderRadius: '8px',
+    padding: '8px 10px',
+    cursor: 'pointer',
+    fontSize: '13px',
+    fontWeight: 700,
+  },
+  cardKanbanItem: {
+    padding: '14px',
+    background: '#ffffff',
+  },
+  badgeContador: {
+    background: '#ffffff',
+    border: '1px solid #cbd5e1',
+    padding: '2px 8px',
+    borderRadius: '12px',
+    fontSize: '11px',
+    fontWeight: 800,
+    color: '#0f172a',
+  },
+  textoVazioKanban: {
+    color: '#94a3b8',
+    fontSize: '12px',
+    textAlign: 'center',
+    margin: '30px 0',
   },
   cardFormulario: {
     background: '#fff',
