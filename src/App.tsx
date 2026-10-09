@@ -157,7 +157,6 @@ export default function App() {
   const isAdmin = usuarioLogado?.tipo === 'admin';
   const isMecanico = usuarioLogado?.tipo === 'mecanico';
 
-  // Normalização estrita para eliminar inconsistências entre "João" e "Joao"
   function compararNomes(a?: string | null, b?: string | null) {
     if (!a || !b) return false;
     const limpoA = a.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
@@ -165,7 +164,6 @@ export default function App() {
     return limpoA === limpoB;
   }
 
-  // Mecânico visualiza estritamente os chamados designados a ele
   const chamadosVisiveis = isAdmin
     ? chamados
     : chamados.filter((chamado) => {
@@ -261,18 +259,19 @@ export default function App() {
     instalarCssResponsivo();
     carregarDados(false);
 
-    // Subscrição em Tempo Real com captura imediata de payload via WebSocket
+    // 1. Ouvinte Realtime com canal único por sessão
+    const canalId = `canal_${Math.random().toString(36).substring(7)}`;
     const canal = supabase
-      .channel('controlmaq-sync-realtime')
+      .channel(canalId)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'chamados' },
         (payload) => {
-          console.log('[REALTIME] Chamado inserido:', payload);
-          const novoChamado = payload.new as Chamado;
+          console.log('[REALTIME INSERT]', payload);
+          const novo = payload.new as Chamado;
           setChamados((prev) => {
-            if (prev.some((c) => c.id === novoChamado.id)) return prev;
-            return [novoChamado, ...prev];
+            if (prev.some((c) => c.id === novo.id)) return prev;
+            return [novo, ...prev];
           });
         }
       )
@@ -280,10 +279,10 @@ export default function App() {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'chamados' },
         (payload) => {
-          console.log('[REALTIME] Chamado atualizado:', payload);
-          const chamadoAtualizado = payload.new as Chamado;
+          console.log('[REALTIME UPDATE]', payload);
+          const atualizado = payload.new as Chamado;
           setChamados((prev) =>
-            prev.map((c) => (c.id === chamadoAtualizado.id ? chamadoAtualizado : c))
+            prev.map((c) => (c.id === atualizado.id ? atualizado : c))
           );
         }
       )
@@ -291,37 +290,29 @@ export default function App() {
         'postgres_changes',
         { event: 'DELETE', schema: 'public', table: 'chamados' },
         (payload) => {
-          console.log('[REALTIME] Chamado excluído:', payload);
           const idExcluido = (payload.old as { id: number }).id;
           setChamados((prev) => prev.filter((c) => c.id !== idExcluido));
         }
       )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'maquinas' },
-        () => carregarDados(false)
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'usuarios' },
-        () => carregarDados(false)
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'leituras_horimetro' },
-        () => carregarDados(false)
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'historico_preventivas' },
-        () => carregarDados(false)
-      )
       .subscribe((status) => {
-        console.log('[REALTIME] Status da conexão:', status);
+        console.log('[REALTIME STATUS]', status);
       });
+
+    // 2. Polling inteligente de segurança a cada 4 segundos (garante sync mesmo com 4G oscilando)
+    const intervaloPolling = setInterval(async () => {
+      try {
+        const { data } = await supabase.from('chamados').select('*').order('id', { ascending: false });
+        if (data) {
+          setChamados(data as Chamado[]);
+        }
+      } catch {
+        // Ignora silenciosamente erros de oscilação transitória
+      }
+    }, 4000);
 
     return () => {
       supabase.removeChannel(canal);
+      clearInterval(intervaloPolling);
     };
   }, []);
 
@@ -993,7 +984,6 @@ export default function App() {
     }
   }
 
-  // CRIAÇÃO DE CHAMADO COM TRATAMENTO DE ERROS E ALERTA VISUAL
   async function criarChamado(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!usuarioLogado) {
@@ -1301,7 +1291,7 @@ export default function App() {
           maxWidth: '100vw',
         }}
       >
-        {/* TELA 1: DASHBOARD EXECUTIVO (APENAS ADMINISTRADOR) */}
+        {/* TELA 1: DASHBOARD EXECUTIVO */}
         {tela === 'dashboard' && isAdmin && (
           <DashboardExecutivo
             usuario={usuarioLogado}
@@ -1746,7 +1736,7 @@ export default function App() {
           </div>
         )}
 
-        {/* TELA 7: HORÍMETROS (ADMINISTRADOR) */}
+        {/* TELA 7: HORÍMETROS */}
         {tela === 'horimetros' && isAdmin && (
           <div>
             <div style={{ ...estilos.cabecalhoPagina, flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'flex-end', gap: isMobile ? '10px' : '0' }}>
