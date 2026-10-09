@@ -157,15 +157,20 @@ export default function App() {
   const isAdmin = usuarioLogado?.tipo === 'admin';
   const isMecanico = usuarioLogado?.tipo === 'mecanico';
 
+  // Normalização estrita para eliminar inconsistências entre "João" e "Joao"
+  function compararNomes(a?: string | null, b?: string | null) {
+    if (!a || !b) return false;
+    const limpoA = a.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+    const limpoB = b.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+    return limpoA === limpoB;
+  }
+
   // Mecânico visualiza estritamente os chamados designados a ele
   const chamadosVisiveis = isAdmin
     ? chamados
     : chamados.filter((chamado) => {
         if (!usuarioLogado) return false;
-        return (
-          normalizarTexto(chamado.mecanico || '') ===
-          normalizarTexto(usuarioLogado.nome)
-        );
+        return compararNomes(chamado.mecanico, usuarioLogado.nome);
       });
 
   const chamadosAbertos = chamadosVisiveis.filter((c) => c.status === 'Aberto');
@@ -198,7 +203,7 @@ export default function App() {
     .filter((chamado) => {
       if (filtroPrioridadeChamados && chamado.prioridade !== filtroPrioridadeChamados) return false;
       if (filtroMaquinaChamados && normalizarTexto(chamado.maquina) !== normalizarTexto(filtroMaquinaChamados)) return false;
-      if (filtroMecanicoChamados && normalizarTexto(chamado.mecanico || '') !== normalizarTexto(filtroMecanicoChamados)) return false;
+      if (filtroMecanicoChamados && !compararNomes(chamado.mecanico, filtroMecanicoChamados)) return false;
       return true;
     })
     .sort((a, b) => {
@@ -256,7 +261,7 @@ export default function App() {
     instalarCssResponsivo();
     carregarDados(false);
 
-    // Subscrição em Tempo Real com captura direta de payload
+    // Subscrição em Tempo Real com captura imediata de payload via WebSocket
     const canal = supabase
       .channel('controlmaq-sync-realtime')
       .on(
@@ -349,9 +354,9 @@ export default function App() {
         supabase.from('usuarios').select('*').order('nome', { ascending: true }),
         supabase.from('maquinas').select('*').order('tag', { ascending: true }),
         supabase.from('chamados').select('*').order('id', { ascending: false }),
-        supabase.from('historico_chamados').select('*').order('created_at', { ascending: false }),
-        supabase.from('leituras_horimetro').select('*').order('created_at', { ascending: false }),
-        supabase.from('operacoes_diarias').select('*').order('iniciado_at', { ascending: false }),
+        supabase.from('historico_chamados').select('*').order('id', { ascending: false }),
+        supabase.from('leituras_horimetro').select('*').order('id', { ascending: false }),
+        supabase.from('operacoes_diarias').select('*').order('id', { ascending: false }),
         carregarPreventivas(),
         carregarHistoricoPreventivas(),
       ]);
