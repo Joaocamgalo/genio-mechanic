@@ -125,3 +125,85 @@ code {
 .cm-online-pill--online { background: #ecfdf3; color: #027a48; border-color: #abefc6; }
 .cm-online-pill--offline { background: #fef3f2; color: #b42318; border-color: #fecdca; }
 .cm-online-pill__dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+
+/* =========================================================
+   CORREÇÃO CIRÚRGICA DE LAYOUT MOBILE - CONTROLMAQ
+   ========================================================= */
+
+@media screen and (max-width: 768px) {
+  /* Impede transbordamento horizontal da tela */
+  html, body {
+    overflow-x: hidden !important;
+    width: 100vw !important;
+  }
+
+  /* Barra superior do celular: não sobrepor ao conteúdo */
+  .controlmaq-topbar, header {
+    left: 0 !important;
+    width: 100% !important;
+    padding: 0 12px !important;
+  }
+
+  /* Ajusta o espaçamento do conteúdo principal */
+  .controlmaq-main, main {
+    margin-left: 0 !important;
+    width: 100% !important;
+    padding: 74px 12px 40px !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Transforma grelhas de 2, 3 ou 4 colunas em 1 coluna vertical limpa */
+  .listaMaquinas,
+  div[style*="gridTemplateColumns"],
+  div[style*="repeat(auto-fill"] {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* Evita que títulos e textos longos fiquem por cima uns dos outros */
+  h1, h2, h3 {
+    font-size: 1.25rem !important;
+    line-height: 1.3 !important;
+    word-break: break-word !important;
+  }
+
+  p, span, div, strong {
+    word-break: break-word !important;
+  }
+
+  /* Cabeçalhos que tinham botões lado a lado empilham organizadamente */
+  div[style*="justify-content: space-between"] {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  /* Quadro Kanban com rolagem lateral fluida e cartões que cabem na tela */
+  .kanban-grid {
+    display: flex !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scroll-snap-type: x mandatory !important;
+    gap: 12px !important;
+    padding-bottom: 14px !important;
+  }
+
+  .kanban-coluna {
+    flex: 0 0 85vw !important;
+    min-width: 280px !important;
+    scroll-snap-align: start !important;
+  }
+
+  /* Modais ocupam largura quase total da tela do celular sem cortar */
+  div[style*="modalCard"],
+  div[style*="cardFormulario"] {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    padding: 16px !important;
+    margin: 0 auto !important;
+  }
+
+  /* Ajusta tamanhos de botões e inputs para toque de dedo */
+  input, select, textarea, button {
+    font-size: 14px !important;
+  }
+}
