@@ -988,9 +988,13 @@ export default function App() {
     }
   }
 
+  // CRIAÇÃO DE CHAMADO COM TRATAMENTO DE ERROS E ALERTA VISUAL
   async function criarChamado(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!usuarioLogado) return;
+    if (!usuarioLogado) {
+      alert('Sessão expirada. Inicie sessão novamente.');
+      return;
+    }
 
     const form = new FormData(event.currentTarget);
     const maquina = String(form.get('maquina') || '').trim();
@@ -1003,7 +1007,7 @@ export default function App() {
     const mecanicoDesignado = String(form.get('mecanicoDesignado') || '').trim();
 
     if (!maquina || !solicitante || !local || !problema) {
-      alert('Preencha os campos obrigatórios.');
+      alert('Preencha os campos obrigatórios (Máquina, Solicitante, Local e Problema).');
       return;
     }
 
@@ -1027,12 +1031,22 @@ export default function App() {
         .select()
         .single();
 
-      if (!error && data) {
+      if (error) {
+        console.error('Erro ao gravar chamado no Supabase:', error);
+        alert('Erro ao gravar chamado: ' + error.message);
+        return;
+      }
+
+      if (data) {
         setChamados((prev) => [data as Chamado, ...prev]);
         setMaquinaNovoChamado('');
         setFiltroChamados('Todos');
         setTela('chamados');
+        alert('Ordem de Serviço criada com sucesso!');
       }
+    } catch (err: any) {
+      console.error('Falha geral ao criar chamado:', err);
+      alert('Erro inesperado: ' + (err?.message || 'Verifique a sua ligação.'));
     } finally {
       setSalvando(false);
     }
@@ -1685,7 +1699,9 @@ export default function App() {
               <input name="local" style={estilos.input} required />
               <label style={estilos.label}>Problema *</label>
               <textarea name="problema" style={estilos.textarea} required />
-              <button type="submit" style={{ ...estilos.botaoNovoSubmit, marginTop: '14px' }} disabled={salvando}>Confirmar</button>
+              <button type="submit" style={{ ...estilos.botaoNovoSubmit, marginTop: '14px' }} disabled={salvando}>
+                {salvando ? 'A gravar...' : 'Confirmar'}
+              </button>
             </form>
           </div>
         )}
