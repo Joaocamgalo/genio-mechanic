@@ -107,7 +107,7 @@ export default function App() {
   // Apontamento de Horímetro em Lote
   const [leiturasLote, setLeiturasLote] = useState<Record<string, string>>({});
 
-  // Filtros de Usuários
+  // Filtros de Utilizadores
   const [buscaUsuarios, setBuscaUsuarios] = useState('');
 
   // Filtros de Preventivas
@@ -157,7 +157,7 @@ export default function App() {
   const isAdmin = usuarioLogado?.tipo === 'admin';
   const isMecanico = usuarioLogado?.tipo === 'mecanico';
 
-  // O Mecânico visualiza estritamente os chamados atribuídos ao seu nome
+  // Mecânico visualiza estritamente os chamados designados a ele
   const chamadosVisiveis = isAdmin
     ? chamados
     : chamados.filter((chamado) => {
@@ -256,7 +256,7 @@ export default function App() {
     instalarCssResponsivo();
     carregarDados(false);
 
-    // Subscrição em Tempo Real com atualização imediata de estado e monitorização por log
+    // Subscrição em Tempo Real com captura direta de payload
     const canal = supabase
       .channel('controlmaq-sync-realtime')
       .on(
