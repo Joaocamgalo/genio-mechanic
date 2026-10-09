@@ -78,7 +78,9 @@ export default function App() {
       if (salvo) {
         const u = JSON.parse(salvo) as Usuario;
         if (u?.id && u?.login && u?.tipo) {
-          return u.tipo === 'operador' ? 'operacaoDiaria' : 'dashboard';
+          if (u.tipo === 'operador') return 'operacaoDiaria';
+          if (u.tipo === 'mecanico') return 'chamados';
+          return 'dashboard';
         }
       }
     } catch {
@@ -88,7 +90,7 @@ export default function App() {
   });
 
   // Filtros e Visualização de Chamados
-  const [modoVisualizacao, setModoVisualizacao] = useState<'lista' | 'kanban'>('kanban');
+  const [modoVisualizacao, setModoVisualizacao] = useState<'lista' | 'kanban'>('lista');
   const [filtroChamados, setFiltroChamados] = useState<FiltroChamado>('Todos');
   const [buscaChamados, setBuscaChamados] = useState('');
   const [filtroPrioridadeChamados, setFiltroPrioridadeChamados] = useState('');
@@ -153,14 +155,16 @@ export default function App() {
   const [maquinaNovoChamado, setMaquinaNovoChamado] = useState('');
 
   const isAdmin = usuarioLogado?.tipo === 'admin';
+  const isMecanico = usuarioLogado?.tipo === 'mecanico';
 
+  // REGRA DE OURO: Mecânico só vê rigorosamente o que foi designado para ele!
   const chamadosVisiveis = isAdmin
     ? chamados
     : chamados.filter((chamado) => {
         if (!usuarioLogado) return false;
-        if (chamado.status === 'Aberto') return true;
         return (
-          normalizarTexto(chamado.mecanico) === normalizarTexto(usuarioLogado.nome)
+          normalizarTexto(chamado.mecanico || '') ===
+          normalizarTexto(usuarioLogado.nome)
         );
       });
 
@@ -735,12 +739,20 @@ export default function App() {
       }
 
       const agoraAcesso = new Date().toISOString();
-      await supabase.from('usuarios').update({冷却acesso: agoraAcesso, ultimo_acesso: agoraAcesso }).eq('id', data.id);
+      await supabase.from('usuarios').update({ ultimo_acesso: agoraAcesso }).eq('id', data.id);
 
       const usuarioEncontrado = { ...data, ultimo_acesso: agoraAcesso } as Usuario;
       setUsuarioLogado(usuarioEncontrado);
       salvarLoginLocal(usuarioEncontrado);
-      setTela(usuarioEncontrado.tipo === 'operador' ? 'operacaoDiaria' : 'dashboard');
+      
+      if (usuarioEncontrado.tipo === 'operador') {
+        setTela('operacaoDiaria');
+      } else if (usuarioEncontrado.tipo === 'mecanico') {
+        setTela('chamados');
+      } else {
+        setTela('dashboard');
+      }
+
       await carregarDados(false);
     } finally {
       setSalvando(false);
@@ -834,6 +846,10 @@ export default function App() {
   }
 
   async function excluirChamado(chamadoAlvo: Chamado) {
+    if (!isAdmin) {
+      alert('Apenas administradores podem excluir Ordens de Serviço.');
+      return;
+    }
     const confirmar = confirm(`Eliminar a Ordem de Serviço #${chamadoAlvo.id}?`);
     if (!confirmar) return;
 
@@ -938,6 +954,7 @@ export default function App() {
     const local = String(form.get('local') || '').trim();
     const problema = String(form.get('problema') || '').trim();
     const prioridade = String(form.get('prioridade') || 'Média') as Chamado['prioridade'];
+    const mecanicoDesignado = String(form.get('mecanicoDesignado') || '').trim();
 
     if (!maquina || !solicitante || !local || !problema) {
       alert('Preencha os campos obrigatórios.');
@@ -956,7 +973,9 @@ export default function App() {
           local,
           problema,
           prioridade,
-          status: 'Aberto',
+          status: mecanicoDesignado ? 'Assumido' : 'Aberto',
+          mecanico: mecanicoDesignado || null,
+          iniciado_at: mecanicoDesignado ? new Date().toISOString() : null,
           criado_por: usuarioLogado.nome,
         })
         .select()
@@ -965,7 +984,7 @@ export default function App() {
       if (!error && data) {
         setChamados((prev) => [data as Chamado, ...prev]);
         setMaquinaNovoChamado('');
-        setFiltroChamados('Aberto');
+        setFiltroChamados('Todos');
         setTela('chamados');
       }
     } finally {
@@ -973,15 +992,13 @@ export default function App() {
     }
   }
 
-  async function assumirChamado(id: number) {
-    if (!usuarioLogado) return;
-    let mecanicoResponsavel = usuarioLogado.nome;
-
-    if (usuarioLogado.tipo === 'admin') {
-      const nomeInformado = prompt('Nome do mecânico responsável:');
-      if (!nomeInformado) return;
-      mecanicoResponsavel = nomeInformado.trim();
-    }
+  // Apenas o Administrador designa o mecânico
+  async function designarMecanicoAdmin(id: number) {
+    if (!isAdmin) return;
+    const mecanicos = usuarios.filter((u) => u.tipo === 'mecanico');
+    const nomes = mecanicos.map((m) => m.nome).join(', ');
+    const nomeInformado = prompt(`Selecione o mecânico responsável:\n\nOpções: ${nomes}`);
+    if (!nomeInformado) return;
 
     try {
       setSalvando(true);
@@ -989,7 +1006,7 @@ export default function App() {
         .from('chamados')
         .update({
           status: 'Assumido',
-          mecanico: mecanicoResponsavel,
+          mecanico: nomeInformado.trim(),
           iniciado_at: new Date().toISOString(),
         })
         .eq('id', id)
@@ -1088,7 +1105,7 @@ export default function App() {
 
   async function salvarConfiguracaoPreventiva(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!preventivaSelecionada) return;
+    if (!preventivaSelecionada || !isAdmin) return;
 
     const form = new FormData(event.currentTarget);
     const intervaloHoras = Number(String(form.get('intervalo') || '').replace(',', '.'));
@@ -1220,8 +1237,8 @@ export default function App() {
           maxWidth: '100vw',
         }}
       >
-        {/* TELA 1: DASHBOARD */}
-        {tela === 'dashboard' && (
+        {/* TELA 1: DASHBOARD EXECUTIVO (APENAS ADMINISTRADOR) */}
+        {tela === 'dashboard' && isAdmin && (
           <DashboardExecutivo
             usuario={usuarioLogado}
             chamados={chamadosVisiveis}
@@ -1275,22 +1292,24 @@ export default function App() {
                 <h2 style={estilos.tituloSecao}>Frota de Máquinas</h2>
               </div>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <button
-                  onClick={() =>
-                    exportarParaCsv(
-                      'Frota_Lokmax',
-                      ['TAG', 'Marca', 'Modelo', 'Horímetro', 'Status'],
-                      maquinas.map((m) => [m.tag, m.marca, m.modelo, m.horimetro ?? 0, m.status_maquina])
-                    )
-                  }
-                  style={estilos.botaoExportarCsv}
-                >
-                  📥 CSV
-                </button>
                 {isAdmin && (
-                  <button onClick={() => { setMaquinaEmEdicao(null); setModalNovaMaquina(true); }} style={estilos.botaoNovo}>
-                    + Nova Máquina
-                  </button>
+                  <>
+                    <button
+                      onClick={() =>
+                        exportarParaCsv(
+                          'Frota_Lokmax',
+                          ['TAG', 'Marca', 'Modelo', 'Horímetro', 'Status'],
+                          maquinas.map((m) => [m.tag, m.marca, m.modelo, m.horimetro ?? 0, m.status_maquina])
+                        )
+                      }
+                      style={estilos.botaoExportarCsv}
+                    >
+                      📥 CSV
+                    </button>
+                    <button onClick={() => { setMaquinaEmEdicao(null); setModalNovaMaquina(true); }} style={estilos.botaoNovo}>
+                      + Nova Máquina
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -1341,16 +1360,18 @@ export default function App() {
                       </button>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
-                      <button
-                        onClick={() => {
-                          setMaquinaNovoChamado(maquina.tag);
-                          setTela('novoChamado');
-                        }}
-                        style={estilos.botaoCardPrincipal}
-                      >
-                        + Abrir OS
-                      </button>
+                    <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? '1.2fr 1fr' : '1fr', gap: '6px', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
+                      {isAdmin && (
+                        <button
+                          onClick={() => {
+                            setMaquinaNovoChamado(maquina.tag);
+                            setTela('novoChamado');
+                          }}
+                          style={estilos.botaoCardPrincipal}
+                        >
+                          + Abrir OS
+                        </button>
+                      )}
                       <button onClick={() => setMaquinaDossie(maquina)} style={estilos.botaoHistorico}>
                         📋 Dossiê
                       </button>
@@ -1414,44 +1435,50 @@ export default function App() {
           </div>
         )}
 
-        {/* TELA 3: ORDEM DE SERVIÇO */}
+        {/* TELA 3: ORDENS DE SERVIÇO */}
         {tela === 'chamados' && (
           <div>
             <div style={{ ...estilos.cabecalhoPagina, flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'flex-end', gap: isMobile ? '10px' : '0' }}>
               <div>
-                <span style={estilos.preTitulo}>Operação</span>
-                <h2 style={estilos.tituloSecao}>Ordens de Serviço</h2>
+                <span style={estilos.preTitulo}>{isMecanico ? 'Atendimento Técnico' : 'Operação'}</span>
+                <h2 style={estilos.tituloSecao}>{isMecanico ? 'Minhas Ordens de Serviço' : 'Ordens de Serviço'}</h2>
               </div>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <button
-                  onClick={() =>
-                    exportarParaCsv(
-                      'Ordens_de_Servico_Lokmax',
-                      ['OS #', 'Máquina', 'Status', 'Cliente', 'Solicitante', 'Local', 'Mecânico', 'Problema', 'Solução'],
-                      chamados.map((c) => [c.id, c.maquina, c.status, c.cliente || '', c.solicitante, c.local, c.mecanico || '', c.problema, c.solucao || ''])
-                    )
-                  }
-                  style={estilos.botaoExportarCsv}
-                >
-                  📥 CSV
-                </button>
-                <div style={{ display: 'flex', background: '#e2e8f0', padding: '2px', borderRadius: '8px' }}>
-                  <button
-                    onClick={() => setModoVisualizacao('lista')}
-                    style={{ border: 0, padding: '6px 12px', borderRadius: '6px', fontSize: '12px', background: modoVisualizacao === 'lista' ? '#fff' : 'transparent' }}
-                  >
-                    Lista
-                  </button>
-                  <button
-                    onClick={() => setModoVisualizacao('kanban')}
-                    style={{ border: 0, padding: '6px 12px', borderRadius: '6px', fontSize: '12px', background: modoVisualizacao === 'kanban' ? '#fff' : 'transparent' }}
-                  >
-                    Kanban
-                  </button>
-                </div>
-                <button onClick={() => { setMaquinaNovoChamado(''); setTela('novoChamado'); }} style={estilos.botaoNovo}>
-                  + Abrir OS
-                </button>
+                {isAdmin && (
+                  <>
+                    <button
+                      onClick={() =>
+                        exportarParaCsv(
+                          'Ordens_de_Servico_Lokmax',
+                          ['OS #', 'Máquina', 'Status', 'Cliente', 'Solicitante', 'Local', 'Mecânico', 'Problema', 'Solução'],
+                          chamados.map((c) => [c.id, c.maquina, c.status, c.cliente || '', c.solicitante, c.local, c.mecanico || '', c.problema, c.solucao || ''])
+                        )
+                      }
+                      style={estilos.botaoExportarCsv}
+                    >
+                      📥 CSV
+                    </button>
+                    <button onClick={() => { setMaquinaNovoChamado(''); setTela('novoChamado'); }} style={estilos.botaoNovo}>
+                      + Abrir OS
+                    </button>
+                  </>
+                )}
+                {isAdmin && (
+                  <div style={{ display: 'flex', background: '#e2e8f0', padding: '2px', borderRadius: '8px' }}>
+                    <button
+                      onClick={() => setModoVisualizacao('lista')}
+                      style={{ border: 0, padding: '6px 12px', borderRadius: '6px', fontSize: '12px', background: modoVisualizacao === 'lista' ? '#fff' : 'transparent' }}
+                    >
+                      Lista
+                    </button>
+                    <button
+                      onClick={() => setModoVisualizacao('kanban')}
+                      style={{ border: 0, padding: '6px 12px', borderRadius: '6px', fontSize: '12px', background: modoVisualizacao === 'kanban' ? '#fff' : 'transparent' }}
+                    >
+                      Kanban
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1462,36 +1489,89 @@ export default function App() {
               style={{ ...estilos.inputBusca, marginBottom: '14px' }}
             />
 
+            {/* Filtros de Status (No mecânico, focado no que é dele) */}
+            <div style={estilos.filtros}>
+              <button
+                onClick={() => setFiltroChamados('Todos')}
+                style={{ ...estilos.botaoFiltro, background: filtroChamados === 'Todos' ? '#0f172a' : '#fff', color: filtroChamados === 'Todos' ? '#fff' : '#475569' }}
+              >
+                Todas ({chamadosVisiveis.length})
+              </button>
+              <button
+                onClick={() => setFiltroChamados('Assumido')}
+                style={{ ...estilos.botaoFiltro, background: filtroChamados === 'Assumido' ? '#f59e0b' : '#fff', color: filtroChamados === 'Assumido' ? '#fff' : '#475569' }}
+              >
+                Em Andamento ({chamadosAssumidos.length})
+              </button>
+              <button
+                onClick={() => setFiltroChamados('Finalizado')}
+                style={{ ...estilos.botaoFiltro, background: filtroChamados === 'Finalizado' ? '#16a34a' : '#fff', color: filtroChamados === 'Finalizado' ? '#fff' : '#475569' }}
+              >
+                Concluídas ({chamadosFinalizados.length})
+              </button>
+            </div>
+
             {modoVisualizacao === 'lista' && (
               <div style={{ ...estilos.listaMaquinas, gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))' }}>
-                {chamadosFiltrados.map((c) => (
-                  <div key={c.id} className="cm-card" style={estilos.cardMaquinaNovo}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                      <strong>{c.maquina}</strong>
-                      <span className={`cm-badge badge-${c.status.toLowerCase()}`}>{c.status}</span>
-                    </div>
-                    <p style={{ margin: '0 0 10px', fontSize: '13px' }}>{c.problema}</p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '6px' }}>
-                      <button onClick={() => { setChamadoDetalhes(c); setTela('detalhesChamado'); }} style={estilos.botaoAjustarHorimetro}>
-                        Ver
-                      </button>
-                      {c.status === 'Aberto' && (
-                        <button onClick={() => assumirChamado(c.id)} style={estilos.botaoCardPrincipal}>Assumir</button>
-                      )}
-                      {c.status === 'Assumido' && (
-                        <button onClick={() => abrirTelaFinalizar(c.id)} style={{ ...estilos.botaoCardPrincipal, background: '#16a34a' }}>Concluir</button>
-                      )}
-                      {c.status === 'Finalizado' && (
-                        <button onClick={() => gerarPdfChamado(c)} style={estilos.botaoCardPrincipal}>PDF</button>
-                      )}
-                      <button onClick={() => excluirChamado(c)} style={estilos.botaoExcluirOS}>🗑</button>
-                    </div>
+                {chamadosFiltrados.length === 0 ? (
+                  <div style={{ ...estilos.cardFormulario, textAlign: 'center', gridColumn: '1 / -1', padding: '30px' }}>
+                    <p style={{ color: '#64748b', margin: 0 }}>
+                      {isMecanico ? 'Você não possui Ordens de Serviço designadas no momento.' : 'Nenhuma OS encontrada.'}
+                    </p>
                   </div>
-                ))}
+                ) : (
+                  chamadosFiltrados.map((c) => (
+                    <div key={c.id} className="cm-card" style={estilos.cardMaquinaNovo}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                        <div>
+                          <strong>{c.maquina}</strong>
+                          <span style={{ fontSize: '11px', color: '#94a3b8', marginLeft: '6px' }}>#{c.id}</span>
+                        </div>
+                        <span className={`cm-badge badge-${c.status.toLowerCase()}`}>{c.status}</span>
+                      </div>
+                      <p style={{ margin: '0 0 10px', fontSize: '13px' }}>{c.problema}</p>
+                      <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '12px', display: 'grid', gap: '3px' }}>
+                        <div>📍 {c.local}</div>
+                        <div>👤 Solicitante: {c.solicitante}</div>
+                        {isAdmin && <div>🔧 Mecânico: <strong>{c.mecanico || 'Não designado'}</strong></div>}
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '6px' }}>
+                        <button onClick={() => { setChamadoDetalhes(c); setTela('detalhesChamado'); }} style={estilos.botaoAjustarHorimetro}>
+                          Ver
+                        </button>
+                        
+                        {/* Apenas o admin designa */}
+                        {isAdmin && c.status === 'Aberto' && (
+                          <button onClick={() => designarMecanicoAdmin(c.id)} style={estilos.botaoCardPrincipal}>
+                            Designar
+                          </button>
+                        )}
+
+                        {/* O mecânico só vê o botão de concluir quando a OS está com ele */}
+                        {c.status === 'Assumido' && (
+                          <button onClick={() => abrirTelaFinalizar(c.id)} style={{ ...estilos.botaoCardPrincipal, background: '#16a34a' }}>
+                            Concluir OS
+                          </button>
+                        )}
+
+                        {c.status === 'Finalizado' && (
+                          <button onClick={() => gerarPdfChamado(c)} style={estilos.botaoCardPrincipal}>
+                            PDF
+                          </button>
+                        )}
+
+                        {isAdmin && (
+                          <button onClick={() => excluirChamado(c)} style={estilos.botaoExcluirOS}>🗑</button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             )}
 
-            {modoVisualizacao === 'kanban' && (
+            {modoVisualizacao === 'kanban' && isAdmin && (
               <div className="kanban-grid">
                 <div className="kanban-coluna">
                   <strong>🔴 Abertos ({chamadosAbertos.length})</strong>
@@ -1499,7 +1579,7 @@ export default function App() {
                     <div key={c.id} className="cm-card" style={{ padding: '10px' }}>
                       <div style={{ fontWeight: 700 }}>{c.maquina}</div>
                       <p style={{ fontSize: '12px', margin: '4px 0 8px' }}>{c.problema}</p>
-                      <button onClick={() => assumirChamado(c.id)} style={estilos.botaoCardPrincipal}>Assumir OS</button>
+                      <button onClick={() => designarMecanicoAdmin(c.id)} style={estilos.botaoCardPrincipal}>Designar Mecânico</button>
                     </div>
                   ))}
                 </div>
@@ -1510,6 +1590,7 @@ export default function App() {
                     <div key={c.id} className="cm-card" style={{ padding: '10px' }}>
                       <div style={{ fontWeight: 700 }}>{c.maquina}</div>
                       <p style={{ fontSize: '12px', margin: '4px 0 8px' }}>{c.problema}</p>
+                      <small style={{ color: '#0f172a', fontWeight: 600, display: 'block', marginBottom: '6px' }}>🔧 {c.mecanico}</small>
                       <button onClick={() => abrirTelaFinalizar(c.id)} style={{ ...estilos.botaoCardPrincipal, background: '#16a34a' }}>Concluir</button>
                     </div>
                   ))}
@@ -1530,7 +1611,7 @@ export default function App() {
           </div>
         )}
 
-        {/* TELA 4: NOVO CHAMADO */}
+        {/* TELA 4: NOVO CHAMADO (ADMIN DESIGNANDO DIRETO) */}
         {tela === 'novoChamado' && (
           <div style={{ ...estilos.cardFormulario, width: isMobile ? '95vw' : '100%', padding: isMobile ? '16px' : '28px' }}>
             <button onClick={() => setTela('chamados')} style={estilos.botaoVoltar}>← Cancelar</button>
@@ -1543,6 +1624,19 @@ export default function App() {
                   <option key={m.id} value={m.tag}>{m.tag} - {m.marca} {m.modelo}</option>
                 ))}
               </select>
+              
+              {isAdmin && (
+                <>
+                  <label style={estilos.label}>Designar para Mecânico</label>
+                  <select name="mecanicoDesignado" style={estilos.input}>
+                    <option value="">Deixar em Aberto (Designar Depois)</option>
+                    {usuarios.filter((u) => u.tipo === 'mecanico').map((m) => (
+                      <option key={m.id} value={m.nome}>{m.nome}</option>
+                    ))}
+                  </select>
+                </>
+              )}
+
               <label style={estilos.label}>Solicitante *</label>
               <input name="solicitante" style={estilos.input} required />
               <label style={estilos.label}>Local *</label>
@@ -1558,7 +1652,7 @@ export default function App() {
         {tela === 'finalizarChamado' && chamadoParaFinalizar && (
           <div style={{ ...estilos.cardFormulario, width: isMobile ? '95vw' : '100%', maxWidth: '650px', padding: isMobile ? '16px' : '28px' }}>
             <button onClick={() => setTela('chamados')} style={estilos.botaoVoltar}>← Cancelar</button>
-            <h3>Concluir OS #{chamadoParaFinalizar.id}</h3>
+            <h3>Concluir OS #{chamadoParaFinalizar.id} — {chamadoParaFinalizar.maquina}</h3>
             <form onSubmit={concluirFinalizacao}>
               <label style={estilos.label}>Diagnóstico Técnico *</label>
               <textarea name="diagnosticoTecnico" style={estilos.textarea} required />
@@ -1567,7 +1661,7 @@ export default function App() {
               <label style={estilos.label}>Peças / Insumos Utilizados</label>
               <input name="pecasUtilizadas" placeholder="Ex: Mangueira, Graxa..." style={estilos.input} />
 
-              <label style={{ ...estilos.label, marginTop: '12px' }}>Assinatura Digital</label>
+              <label style={{ ...estilos.label, marginTop: '12px' }}>Assinatura do Responsável na Obra / Técnico</label>
               <QuadroAssinaturaDigital onChange={setAssinaturaDataUrl} />
 
               <button type="submit" style={{ ...estilos.botaoNovoSubmit, background: '#16a34a', marginTop: '16px' }} disabled={salvando}>
@@ -1589,8 +1683,8 @@ export default function App() {
           </div>
         )}
 
-        {/* TELA 7: HORÍMETROS */}
-        {tela === 'horimetros' && (
+        {/* TELA 7: HORÍMETROS (ADMINISTRADOR) */}
+        {tela === 'horimetros' && isAdmin && (
           <div>
             <div style={{ ...estilos.cabecalhoPagina, flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'flex-end', gap: isMobile ? '10px' : '0' }}>
               <div>
@@ -1630,18 +1724,20 @@ export default function App() {
                 <span style={estilos.preTitulo}>Revisões</span>
                 <h2 style={estilos.tituloSecao}>Plano Preventivo</h2>
               </div>
-              <button
-                onClick={() =>
-                  exportarParaCsv(
-                    'Plano_Preventivo_Lokmax',
-                    ['TAG', 'Marca', 'Modelo', 'Horímetro Atual', 'Próxima Revisão', 'Intervalo', 'Status'],
-                    preventivas.map((p) => [p.tag, p.marca, p.modelo, p.horimetro_atual ?? 0, p.proxima_preventiva_horimetro ?? 'Pendente', p.intervalo_horas ?? 0, p.status_preventiva])
-                  )
-                }
-                style={estilos.botaoExportarCsv}
-              >
-                📥 CSV
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() =>
+                    exportarParaCsv(
+                      'Plano_Preventivo_Lokmax',
+                      ['TAG', 'Marca', 'Modelo', 'Horímetro Atual', 'Próxima Revisão', 'Intervalo', 'Status'],
+                      preventivas.map((p) => [p.tag, p.marca, p.modelo, p.horimetro_atual ?? 0, p.proxima_preventiva_horimetro ?? 'Pendente', p.intervalo_horas ?? 0, p.status_preventiva])
+                    )
+                  }
+                  style={estilos.botaoExportarCsv}
+                >
+                  📥 CSV
+                </button>
+              )}
             </div>
             <div style={{ ...estilos.listaMaquinas, gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))' }}>
               {preventivasFiltradas.map((p) => (
@@ -1653,13 +1749,15 @@ export default function App() {
                   <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '10px' }}>
                     Atual: <strong>{p.horimetro_atual ?? 0} h</strong> | Próxima: <strong>{p.proxima_preventiva_horimetro ?? 'Pendente'} h</strong>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? '1fr 1fr 1fr' : '1fr 1fr', gap: '6px' }}>
                     <button onClick={() => { setPreventivaSelecionada(p); setModoPreventiva('registrar'); }} style={estilos.botaoCardPrincipal}>
                       ✓ Revisão
                     </button>
-                    <button onClick={() => { setPreventivaSelecionada(p); setModoPreventiva('configurar'); }} style={estilos.botaoAjustarHorimetro}>
-                      ⚙ Plano
-                    </button>
+                    {isAdmin && (
+                      <button onClick={() => { setPreventivaSelecionada(p); setModoPreventiva('configurar'); }} style={estilos.botaoAjustarHorimetro}>
+                        ⚙ Plano
+                      </button>
+                    )}
                     <button onClick={() => setMaquinaHistoricoModal(p)} style={estilos.botaoHistorico}>
                       📜 Histórico
                     </button>
@@ -1670,8 +1768,8 @@ export default function App() {
           </div>
         )}
 
-        {/* MODAL CONFIGURAR PREVENTIVA */}
-        {modoPreventiva === 'configurar' && preventivaSelecionada && (
+        {/* MODAL CONFIGURAR PREVENTIVA (ADMIN) */}
+        {modoPreventiva === 'configurar' && preventivaSelecionada && isAdmin && (
           <div style={estilos.modalOverlay}>
             <div style={{ ...estilos.modalCard, width: isMobile ? '95vw' : '100%', maxWidth: '500px', padding: isMobile ? '16px' : '24px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
@@ -1797,7 +1895,7 @@ export default function App() {
           </div>
         )}
 
-        {/* TELA 9: UTILIZADORES */}
+        {/* TELA 9: UTILIZADORES (APENAS ADMINISTRADOR) */}
         {tela === 'usuarios' && isAdmin && (
           <div>
             <div style={{ ...estilos.cabecalhoPagina, flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'flex-end', gap: isMobile ? '10px' : '0' }}>
@@ -1827,7 +1925,7 @@ export default function App() {
           </div>
         )}
 
-        {/* TELA 10: NOVO UTILIZADOR */}
+        {/* TELA 10: NOVO UTILIZADOR (ADMINISTRADOR) */}
         {tela === 'novoUsuario' && isAdmin && (
           <div style={{ ...estilos.cardFormulario, width: isMobile ? '95vw' : '100%', padding: isMobile ? '16px' : '28px' }}>
             <button onClick={() => setTela('usuarios')} style={estilos.botaoVoltar}>← Cancelar</button>
@@ -1955,19 +2053,20 @@ function Topo(props: {
 }) {
   const [menuAberto, setMenuAberto] = useState(false);
   const isAdmin = props.usuario?.tipo === 'admin';
+  const isMecanico = props.usuario?.tipo === 'mecanico';
 
+  // Menu customizado estritamente pelo perfil logado
   const itens = [
-    { tela: 'dashboard' as const, label: 'Painel Executivo' },
-    { tela: 'chamados' as const, label: 'Ordens de Serviço' },
+    ...(isAdmin ? [{ tela: 'dashboard' as const, label: 'Painel Executivo' }] : []),
+    { tela: 'chamados' as const, label: isMecanico ? 'Minhas O.S.' : 'Ordens de Serviço' },
     { tela: 'maquinas' as const, label: 'Frota de Máquinas' },
-    { tela: 'preventivas' as const, label: 'Plano Preventivo', admin: true },
-    { tela: 'horimetros' as const, label: 'Horímetros', admin: true },
-    { tela: 'usuarios' as const, label: 'Utilizadores', admin: true },
+    { tela: 'preventivas' as const, label: 'Plano Preventivo' },
+    ...(isAdmin ? [{ tela: 'horimetros' as const, label: 'Horímetros' }] : []),
+    ...(isAdmin ? [{ tela: 'usuarios' as const, label: 'Utilizadores' }] : []),
   ];
 
   return (
     <>
-      {/* Fundo escurecido no telemóvel ao abrir menu */}
       {props.isMobile && menuAberto && (
         <div
           onClick={() => setMenuAberto(false)}
@@ -1987,7 +2086,6 @@ function Topo(props: {
             <div style={{ background: '#f59e0b', color: '#000', fontWeight: 900, padding: '6px 10px', borderRadius: '6px' }}>CM</div>
             <strong>ControlMaq</strong>
           </div>
-          {/* Botão de Fechar o Menu (✕) visível no telemóvel */}
           {props.isMobile && (
             <button
               onClick={() => setMenuAberto(false)}
@@ -2010,7 +2108,7 @@ function Topo(props: {
           )}
         </div>
         <nav style={{ padding: '10px', display: 'grid', gap: '4px' }}>
-          {itens.filter((i) => !i.admin || isAdmin).map((item) => (
+          {itens.map((item) => (
             <button
               key={item.tela}
               onClick={() => { props.onNavigate(item.tela); setMenuAberto(false); }}
@@ -2025,6 +2123,9 @@ function Topo(props: {
           ))}
         </nav>
         <div style={{ marginTop: 'auto', padding: '16px', borderTop: '1px solid #1e293b' }}>
+          <div style={{ marginBottom: '8px', fontSize: '11px', color: '#64748b' }}>
+            Perfil: <strong style={{ color: '#fff', textTransform: 'capitalize' }}>{props.usuario?.tipo}</strong>
+          </div>
           <button onClick={props.onSair} style={estilos.sidebarSair}>Terminar Sessão</button>
         </div>
       </aside>
