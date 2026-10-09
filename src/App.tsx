@@ -157,7 +157,7 @@ export default function App() {
   const isAdmin = usuarioLogado?.tipo === 'admin';
   const isMecanico = usuarioLogado?.tipo === 'mecanico';
 
-  // REGRA DE OURO: Mecânico só vê rigorosamente o que foi designado para ele!
+  // O Mecânico visualiza estritamente os chamados atribuídos ao seu nome
   const chamadosVisiveis = isAdmin
     ? chamados
     : chamados.filter((chamado) => {
@@ -256,13 +256,58 @@ export default function App() {
     instalarCssResponsivo();
     carregarDados(false);
 
+    // Subscrição em Tempo Real (Realtime) com atualização instantânea do estado
     const canal = supabase
-      .channel('controlmaq-sync-master')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chamados' }, () => carregarDados(false))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'maquinas' }, () => carregarDados(false))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'usuarios' }, () => carregarDados(false))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'leituras_horimetro' }, () => carregarDados(false))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'historico_preventivas' }, () => carregarDados(false))
+      .channel('controlmaq-sync-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'chamados' },
+        (payload) => {
+          const novoChamado = payload.new as Chamado;
+          setChamados((prev) => {
+            if (prev.some((c) => c.id === novoChamado.id)) return prev;
+            return [novoChamado, ...prev];
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'chamados' },
+        (payload) => {
+          const chamadoAtualizado = payload.new as Chamado;
+          setChamados((prev) =>
+            prev.map((c) => (c.id === chamadoAtualizado.id ? chamadoAtualizado : c))
+          );
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'chamados' },
+        (payload) => {
+          const idExcluido = (payload.old as { id: number }).id;
+          setChamados((prev) => prev.filter((c) => c.id !== idExcluido));
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'maquinas' },
+        () => carregarDados(false)
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'usuarios' },
+        () => carregarDados(false)
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'leituras_horimetro' },
+        () => carregarDados(false)
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'historico_preventivas' },
+        () => carregarDados(false)
+      )
       .subscribe();
 
     return () => {
@@ -486,7 +531,6 @@ export default function App() {
     `;
   }
 
-  // EXPORTADOR UNIVERSAL PARA CSV / EXCEL
   function exportarParaCsv(nomeArquivo: string, cabecalhos: string[], linhas: (string | number)[][]) {
     const conteudo = [
       cabecalhos.join(';'),
@@ -502,7 +546,6 @@ export default function App() {
     document.body.removeChild(link);
   }
 
-  // GERADOR OFICIAL DE PDF DA ORDEM DE SERVIÇO COM ASSINATURA DIGITAL & DOWNTIME
   function gerarPdfChamado(chamado: Chamado) {
     const janela = window.open('', '_blank');
     if (!janela) {
@@ -596,7 +639,6 @@ export default function App() {
     janela.document.close();
   }
 
-  // GERADOR DE DOSSIÊ COMPLETO DO ATIVO (PRONTUÁRIO TÉCNICO EM PDF)
   function gerarPdfDossie(m: Maquina) {
     const janela = window.open('', '_blank');
     if (!janela) {
@@ -672,7 +714,6 @@ export default function App() {
     janela.document.close();
   }
 
-  // GERADOR OFICIAL DE PDF DA REVISÃO PREVENTIVA
   function gerarPdfPreventiva(
     maquina: { tag: string; marca: string; modelo: string },
     revisao: {
@@ -992,7 +1033,6 @@ export default function App() {
     }
   }
 
-  // Apenas o Administrador designa o mecânico
   async function designarMecanicoAdmin(id: number) {
     if (!isAdmin) return;
     const mecanicos = usuarios.filter((u) => u.tipo === 'mecanico');
@@ -1489,7 +1529,6 @@ export default function App() {
               style={{ ...estilos.inputBusca, marginBottom: '14px' }}
             />
 
-            {/* Filtros de Status (No mecânico, focado no que é dele) */}
             <div style={estilos.filtros}>
               <button
                 onClick={() => setFiltroChamados('Todos')}
@@ -1541,14 +1580,12 @@ export default function App() {
                           Ver
                         </button>
                         
-                        {/* Apenas o admin designa */}
                         {isAdmin && c.status === 'Aberto' && (
                           <button onClick={() => designarMecanicoAdmin(c.id)} style={estilos.botaoCardPrincipal}>
                             Designar
                           </button>
                         )}
 
-                        {/* O mecânico só vê o botão de concluir quando a OS está com ele */}
                         {c.status === 'Assumido' && (
                           <button onClick={() => abrirTelaFinalizar(c.id)} style={{ ...estilos.botaoCardPrincipal, background: '#16a34a' }}>
                             Concluir OS
@@ -1611,7 +1648,7 @@ export default function App() {
           </div>
         )}
 
-        {/* TELA 4: NOVO CHAMADO (ADMIN DESIGNANDO DIRETO) */}
+        {/* TELA 4: NOVO CHAMADO */}
         {tela === 'novoChamado' && (
           <div style={{ ...estilos.cardFormulario, width: isMobile ? '95vw' : '100%', padding: isMobile ? '16px' : '28px' }}>
             <button onClick={() => setTela('chamados')} style={estilos.botaoVoltar}>← Cancelar</button>
@@ -1768,7 +1805,7 @@ export default function App() {
           </div>
         )}
 
-        {/* MODAL CONFIGURAR PREVENTIVA (ADMIN) */}
+        {/* MODAL CONFIGURAR PREVENTIVA */}
         {modoPreventiva === 'configurar' && preventivaSelecionada && isAdmin && (
           <div style={estilos.modalOverlay}>
             <div style={{ ...estilos.modalCard, width: isMobile ? '95vw' : '100%', maxWidth: '500px', padding: isMobile ? '16px' : '24px' }}>
@@ -1895,7 +1932,7 @@ export default function App() {
           </div>
         )}
 
-        {/* TELA 9: UTILIZADORES (APENAS ADMINISTRADOR) */}
+        {/* TELA 9: UTILIZADORES */}
         {tela === 'usuarios' && isAdmin && (
           <div>
             <div style={{ ...estilos.cabecalhoPagina, flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'flex-end', gap: isMobile ? '10px' : '0' }}>
@@ -1925,7 +1962,7 @@ export default function App() {
           </div>
         )}
 
-        {/* TELA 10: NOVO UTILIZADOR (ADMINISTRADOR) */}
+        {/* TELA 10: NOVO UTILIZADOR */}
         {tela === 'novoUsuario' && isAdmin && (
           <div style={{ ...estilos.cardFormulario, width: isMobile ? '95vw' : '100%', padding: isMobile ? '16px' : '28px' }}>
             <button onClick={() => setTela('usuarios')} style={estilos.botaoVoltar}>← Cancelar</button>
@@ -2055,7 +2092,6 @@ function Topo(props: {
   const isAdmin = props.usuario?.tipo === 'admin';
   const isMecanico = props.usuario?.tipo === 'mecanico';
 
-  // Menu customizado estritamente pelo perfil logado
   const itens = [
     ...(isAdmin ? [{ tela: 'dashboard' as const, label: 'Painel Executivo' }] : []),
     { tela: 'chamados' as const, label: isMecanico ? 'Minhas O.S.' : 'Ordens de Serviço' },
