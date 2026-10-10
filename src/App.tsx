@@ -1220,7 +1220,7 @@ export default function App() {
             <span style={{ fontSize: '30px' }}>🚜</span>
             <div>
               <p style={{ margin: 0, fontWeight: 900, color: '#f59e0b', fontSize: '11px' }}>GE-NIO MECHANIQ</p>
-              <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 900 }}>ControlMaq</h1>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}><img src="/icon-192.png" alt="Ge-Nio" style={{ width: "36px", height: "36px", borderRadius: "8px", objectFit: "contain" }} /><div style={{ display: "flex", flexDirection: "column" }}><span style={{ fontSize: "18px", fontWeight: 900, color: "#f59e0b", lineHeight: "1.1" }}>Ge-Nio</span><span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px", color: "#94a3b8" }}>MECHANIQ</span></div></div>
             </div>
           </div>
           <form onSubmit={entrarNoApp}>
@@ -2239,8 +2239,8 @@ function Topo(props: {
       <aside className={`controlmaq-desktop-sidebar ${menuAberto ? 'controlmaq-sidebar-open' : ''}`} style={estilos.sidebar}>
         <div style={{ padding: '16px', borderBottom: '1px solid #1e293b', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ background: '#f59e0b', color: '#000', fontWeight: 900, padding: '6px 10px', borderRadius: '6px' }}>CM</div>
-            <strong>ControlMaq</strong>
+            <div style={{ background: '#f59e0b', color: '#000', fontWeight: 900, padding: '6px 10px', borderRadius: '6px' }}></div>
+            <strong>Ge-Nio Mechaniq</strong>
           </div>
           {props.isMobile && (
             <button
