@@ -597,18 +597,44 @@ function AtencaoItem(props: {
   cor: string;
   onClick?: () => void;
 }) {
+  const ativo = props.quantidade > 0;
   return (
-    <button type="button" style={styles.atencaoItem} onClick={props.onClick}>
-      <span style={{ ...styles.atencaoPonto, background: props.cor }} />
-      <span style={styles.atencaoLabel}>{props.label}</span>
-      <strong
+    <button
+      type="button"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "12px 14px",
+        background: ativo ? "#ffffff" : "#f8fafc",
+        border: `1px solid ${ativo ? props.cor + "40" : "#e2e8f0"}`,
+        borderLeft: `3px solid ${props.cor}`,
+        borderRadius: "8px",
+        cursor: props.onClick ? "pointer" : "default",
+        boxShadow: ativo ? "0 2px 4px rgba(15, 23, 42, 0.04)" : "none",
+        transition: "all 0.15s ease",
+        textAlign: "left",
+      }}
+      onClick={props.onClick}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: props.cor, display: "inline-block" }} />
+        <span style={{ fontSize: "12px", fontWeight: 700, color: "#334155", letterSpacing: "0.2px" }}>{props.label}</span>
+      </div>
+      <span
         style={{
-          ...styles.atencaoNumero,
-          color: props.quantidade > 0 ? props.cor : '#64748b',
+          fontSize: "12px",
+          fontWeight: 900,
+          padding: "2px 8px",
+          borderRadius: "6px",
+          background: ativo ? `${props.cor}18` : "#e2e8f0",
+          color: ativo ? props.cor : "#64748b",
+          minWidth: "20px",
+          textAlign: "center",
         }}
       >
         {props.quantidade}
-      </strong>
+      </span>
     </button>
   );
 }
