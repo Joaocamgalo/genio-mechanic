@@ -157,7 +157,7 @@ export function DashboardExecutivo({
       >
         <div style={{ ...styles.heroCard, padding: isMobile ? '18px' : '28px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <span style={styles.tagEmpresa}>LOKMAX GESTÃO DE ATIVOS</span>
+            <span style={styles.tagEmpresa}>GE-NIO MECHANIQ</span>
           </div>
           <h2 style={{ ...styles.heroTitulo, fontSize: isMobile ? '20px' : '26px' }}>
             Painel Técnico de Operações

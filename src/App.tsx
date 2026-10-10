@@ -636,7 +636,7 @@ export default function App() {
         <body>
           <div class="cabecalho">
             <div>
-              <div style="font-size: 20px; font-weight: 900;">LOKMAX</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}><img src="/icon-192.png" alt="Ge-Nio" style={{ width: "32px", height: "32px", borderRadius: "6px", objectFit: "contain" }} /><div style={{ fontSize: "18px", fontWeight: 900, color: "#f59e0b", letterSpacing: "-0.5px" }}>Ge-Nio <span style={{ color: "#94a3b8", fontSize: "13px", fontWeight: 700, letterSpacing: "1px" }}>MECHANIQ</span></div></div>
               <div style="font-size: 10px; color: #f59e0b; font-weight: 800;">GESTÃO TÉCNICA DE FROTAS</div>
             </div>
             <div style="text-align: right;">
@@ -1219,7 +1219,7 @@ export default function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
             <span style={{ fontSize: '30px' }}>🚜</span>
             <div>
-              <p style={{ margin: 0, fontWeight: 900, color: '#f59e0b', fontSize: '11px' }}>LOKMAX MÁQUINAS</p>
+              <p style={{ margin: 0, fontWeight: 900, color: '#f59e0b', fontSize: '11px' }}>GE-NIO MECHANIQ</p>
               <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 900 }}>ControlMaq</h1>
             </div>
           </div>
@@ -2298,7 +2298,7 @@ function Topo(props: {
           {props.isMobile && (
             <button onClick={() => setMenuAberto(!menuAberto)} style={estilos.botaoMenuMobile}>☰</button>
           )}
-          <span style={{ fontWeight: 900, color: '#f59e0b' }}>LOKMAX</span>
+          <span style={{ fontWeight: 900, color: '#f59e0b' }}>Ge-Nio Mechaniq</span>
         </div>
         <StatusConexao />
       </header>
