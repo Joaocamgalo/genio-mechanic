@@ -563,7 +563,7 @@ function KpiCard(props: {
         display: "flex",
         flexDirection: "column",
         gap: "6px",
-        transition: "transform 0.15s ease, box-shadow 0.15s ease"
+        transition: "transform 0.15s ease, box-shadow 0.15s ease",
       }}
       onClick={props.onClick}
     >
@@ -578,7 +578,7 @@ function KpiCard(props: {
           padding: "2px 6px",
           borderRadius: "4px",
           background: temAtencao ? `${props.cor}18` : "#f1f5f9",
-          color: temAtencao ? props.cor : "#64748b"
+          color: temAtencao ? props.cor : "#64748b",
         }}>
           {temAtencao ? "AÇÃO" : "ZERADO"}
         </span>
@@ -587,27 +587,6 @@ function KpiCard(props: {
         {props.numero}
       </strong>
       <span style={{ fontSize: "11px", color: "#64748b", fontWeight: 500 }}>{props.descricao}</span>
-    </button>
-  );
-}) {
-  return (
-    <button
-      type="button"
-      style={{
-        ...styles.kpiCard,
-        borderTop: `4px solid ${props.cor}`,
-        background: props.destaque ? '#fff' : '#ffffff',
-      }}
-      onClick={props.onClick}
-    >
-      <div style={styles.kpiCabecalho}>
-        <span style={{ ...styles.kpiPonto, background: props.cor }} />
-        <span style={styles.kpiTitulo}>{props.titulo}</span>
-      </div>
-      <strong style={{ ...styles.kpiNumero, color: props.numero > 0 ? props.cor : '#0f172a' }}>
-        {props.numero}
-      </strong>
-      <span style={styles.kpiDescricao}>{props.descricao}</span>
     </button>
   );
 }
