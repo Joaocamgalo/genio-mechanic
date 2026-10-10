@@ -1298,34 +1298,101 @@ export default function App() {
           maxWidth: '100vw',
         }}
       >
-        {/* BARRA SUPERIOR DE INDICADORES TÉCNICOS (MTTR & DISPONIBILIDADE) */}
+        {/* BARRA SUPERIOR DE INDICADORES TÉCNICOS (NOVO LAYOUT INDUSTRIAL GE-NIO) */}
         {isAdmin && (
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '10px', marginBottom: '16px' }}>
-            <div className="kpi-card">
-              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>DISPONIBILIDADE</span>
-              <div style={{ fontSize: '22px', fontWeight: 900, color: taxaDisponibilidade >= 85 ? '#16a34a' : '#dc2626' }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: "12px", marginBottom: "18px" }}>
+            {/* Card 1: Disponibilidade */}
+            <div style={{
+              background: "#ffffff",
+              borderRadius: "10px",
+              padding: "14px 16px",
+              border: "1px solid #e2e8f0",
+              borderTop: "3px solid " + (taxaDisponibilidade >= 85 ? "#10b981" : "#ef4444"),
+              boxShadow: "0 2px 4px rgba(15, 23, 42, 0.04)",
+              position: "relative"
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                <span style={{ fontSize: "10px", color: "#64748b", fontWeight: 800, letterSpacing: "0.8px" }}>DISPONIBILIDADE</span>
+                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: taxaDisponibilidade >= 85 ? "#10b981" : "#ef4444", display: "inline-block" }}></span>
+              </div>
+              <div style={{ fontSize: "24px", fontWeight: 900, color: taxaDisponibilidade >= 85 ? "#047857" : "#b91c1c", letterSpacing: "-0.5px" }}>
                 {taxaDisponibilidade}%
               </div>
-              <small style={{ fontSize: '10px', color: '#64748b' }}>{maquinasOperacionais}/{totalMaquinas} operando</small>
+              <div style={{ fontSize: "11px", color: "#64748b", marginTop: "4px", fontWeight: 500 }}>
+                <strong style={{ color: "#334155" }}>{maquinasOperacionais}</strong> de {totalMaquinas} operando
+              </div>
             </div>
-            <div className="kpi-card">
-              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>MTTR (MÉDIO)</span>
-              <div style={{ fontSize: '22px', fontWeight: 900, color: '#0f172a' }}>{mttrHoras} h</div>
-              <small style={{ fontSize: '10px', color: '#64748b' }}>Tempo médio de reparo</small>
+
+            {/* Card 2: MTTR */}
+            <div style={{
+              background: "#ffffff",
+              borderRadius: "10px",
+              padding: "14px 16px",
+              border: "1px solid #e2e8f0",
+              borderTop: "3px solid #3b82f6",
+              boxShadow: "0 2px 4px rgba(15, 23, 42, 0.04)"
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                <span style={{ fontSize: "10px", color: "#64748b", fontWeight: 800, letterSpacing: "0.8px" }}>MTTR (MÉDIO)</span>
+                <span style={{ fontSize: "10px", fontWeight: 700, color: "#3b82f6", background: "#eff6ff", padding: "1px 6px", borderRadius: "4px" }}>TEMPO</span>
+              </div>
+              <div style={{ fontSize: "24px", fontWeight: 900, color: "#0f172a", letterSpacing: "-0.5px" }}>
+                {mttrHoras} <span style={{ fontSize: "15px", fontWeight: 700, color: "#64748b" }}>h</span>
+              </div>
+              <div style={{ fontSize: "11px", color: "#64748b", marginTop: "4px", fontWeight: 500 }}>
+                Tempo médio de reparo
+              </div>
             </div>
-            <div className="kpi-card">
-              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>CHAMADOS ATIVOS</span>
-              <div style={{ fontSize: '22px', fontWeight: 900, color: '#f59e0b' }}>
+
+            {/* Card 3: Chamados Ativos */}
+            <div style={{
+              background: "#ffffff",
+              borderRadius: "10px",
+              padding: "14px 16px",
+              border: "1px solid #e2e8f0",
+              borderTop: "3px solid #f59e0b",
+              boxShadow: "0 2px 4px rgba(15, 23, 42, 0.04)"
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                <span style={{ fontSize: "10px", color: "#64748b", fontWeight: 800, letterSpacing: "0.8px" }}>CHAMADOS ATIVOS</span>
+                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: (chamadosAbertos.length + chamadosAssumidos.length) > 0 ? "#f59e0b" : "#10b981", display: "inline-block" }}></span>
+              </div>
+              <div style={{ fontSize: "24px", fontWeight: 900, color: "#b45309", letterSpacing: "-0.5px" }}>
                 {chamadosAbertos.length + chamadosAssumidos.length}
               </div>
-              <small style={{ fontSize: '10px', color: '#64748b' }}>{chamadosAbertos.length} pendentes</small>
+              <div style={{ fontSize: "11px", color: "#64748b", marginTop: "4px", fontWeight: 500 }}>
+                <strong style={{ color: "#d97706" }}>{chamadosAbertos.length}</strong> pendentes de ação
+              </div>
             </div>
-            <div className="kpi-card">
-              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>PREVENTIVAS CRÍTICAS</span>
-              <div style={{ fontSize: '22px', fontWeight: 900, color: preventivasCriticas.length > 0 ? '#dc2626' : '#16a34a' }}>
+
+            {/* Card 4: Preventivas Críticas */}
+            <div style={{
+              background: "#ffffff",
+              borderRadius: "10px",
+              padding: "14px 16px",
+              border: "1px solid #e2e8f0",
+              borderTop: "3px solid " + (preventivasCriticas.length > 0 ? "#dc2626" : "#10b981"),
+              boxShadow: "0 2px 4px rgba(15, 23, 42, 0.04)"
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                <span style={{ fontSize: "10px", color: "#64748b", fontWeight: 800, letterSpacing: "0.8px" }}>PREVENTIVAS CRÍTICAS</span>
+                <span style={{
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  color: preventivasCriticas.length > 0 ? "#dc2626" : "#059669",
+                  background: preventivasCriticas.length > 0 ? "#fef2f2" : "#ecfdf5",
+                  padding: "1px 6px",
+                  borderRadius: "4px"
+                }}>
+                  {preventivasCriticas.length > 0 ? "URGENTE" : "OK"}
+                </span>
+              </div>
+              <div style={{ fontSize: "24px", fontWeight: 900, color: preventivasCriticas.length > 0 ? "#dc2626" : "#059669", letterSpacing: "-0.5px" }}>
                 {preventivasCriticas.length}
               </div>
-              <small style={{ fontSize: '10px', color: '#64748b' }}>Revisões urgentes</small>
+              <div style={{ fontSize: "11px", color: "#64748b", marginTop: "4px", fontWeight: 500 }}>
+                {preventivasCriticas.length > 0 ? "Revisões estouradas" : "Todas em dia"}
+              </div>
             </div>
           </div>
         )}
