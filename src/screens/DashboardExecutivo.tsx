@@ -94,6 +94,72 @@ export function DashboardExecutivo({
     (m) => !leiturasHoje.some((l) => l.maquina_id === m.id)
   );
 
+  
+  // ==========================================
+  // MOTOR PREDITIVO DE HORÍMETRO (GE-NIO)
+  // ==========================================
+  interface PrevisaoPreditiva {
+    maquinaId: number;
+    tag: string;
+    marca: string;
+    modelo: string;
+    horasRestantes: number;
+    ritmoDiario: number;
+    diasRestantes: number;
+    dataEstimada: string;
+    criticidade: "vencida" | "urgente" | "alerta" | "normal";
+  }
+
+  const projecoesPreditivas: PrevisaoPreditiva[] = preventivas
+    .map((prev) => {
+      const leiturasDaMaquina = leiturasHorimetro
+        .filter((l) => l.maquina_id === prev.maquina_id && l.created_at)
+        .sort((a, b) => new Date(a.created_at!).getTime() - new Date(b.created_at!).getTime());
+
+      let ritmoDiario = 6.0; // Padrão de 6h/dia para frotas sem histórico extenso
+      if (leiturasDaMaquina.length >= 2) {
+        const primeira = leiturasDaMaquina[0];
+        const ultima = leiturasDaMaquina[leiturasDaMaquina.length - 1];
+        const diffTempo = (new Date(ultima.created_at!).getTime() - new Date(primeira.created_at!).getTime()) / (1000 * 60 * 60 * 24);
+        const diffHoras = Number(ultima.horimetro) - Number(primeira.horimetro);
+        if (diffTempo >= 1 && diffHoras > 0) {
+          ritmoDiario = Number((diffHoras / diffTempo).toFixed(1));
+        }
+      }
+
+      const horasRest = prev.horas_restantes !== null ? prev.horas_restantes : 0;
+      let diasRestantes = ritmoDiario > 0 ? Math.ceil(horasRest / ritmoDiario) : 999;
+
+      let criticidade: "vencida" | "urgente" | "alerta" | "normal" = "normal";
+      if (horasRest <= 0) {
+        criticidade = "vencida";
+        diasRestantes = 0;
+      } else if (diasRestantes <= 3) {
+        criticidade = "urgente";
+      } else if (diasRestantes <= 7) {
+        criticidade = "alerta";
+      }
+
+      const dataEst = new Date();
+      dataEst.setDate(dataEst.getDate() + diasRestantes);
+      const dataFormatada = dataEst.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+
+      return {
+        maquinaId: prev.maquina_id,
+        tag: prev.tag,
+        marca: prev.marca,
+        modelo: prev.modelo,
+        horasRestantes: horasRest,
+        ritmoDiario,
+        diasRestantes,
+        dataEstimada: dataFormatada,
+        criticidade,
+      };
+    })
+    .sort((a, b) => a.diasRestantes - b.diasRestantes);
+
+  const alertasPreditivos = projecoesPreditivas.filter((p) => p.criticidade !== "normal").slice(0, 4);
+
   function formatarDuracao(minutos: number) {
     if (minutos <= 0) return '0min';
     const horas = Math.floor(minutos / 60);
@@ -373,6 +439,120 @@ export function DashboardExecutivo({
             onAcao({ tipo: 'irParaChamadosFiltrados', filtro: 'Assumido' })
           }
         />
+      </div>
+
+      {/* MÓDULO PREDITIVO DE REVISÕES // GE-NIO INTELLIGENCE */}
+      <div style={{
+        background: "#0f172a",
+        border: "1px solid #334155",
+        borderLeft: "4px solid #f59e0b",
+        borderRadius: "10px",
+        padding: isMobile ? "16px" : "20px 24px",
+        boxShadow: "0 4px 12px rgba(15, 23, 42, 0.15)",
+        marginBottom: "20px"
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: isMobile ? "flex-start" : "center", flexDirection: isMobile ? "column" : "row", gap: "10px", marginBottom: "14px" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#f59e0b", boxShadow: "0 0 8px #f59e0b" }} />
+              <span style={{ fontSize: "11px", fontWeight: 800, color: "#38bdf8", letterSpacing: "1px", textTransform: "uppercase" }}>
+                TELEMETRIA PREDITIVA // PROJEÇÃO DE PARADA
+              </span>
+            </div>
+            <h3 style={{ fontSize: "18px", fontWeight: 900, color: "#f8fafc", margin: "4px 0 0 0", letterSpacing: "-0.5px" }}>
+              Previsão de Revisões Preventivas por Ritmo de Uso
+            </h3>
+          </div>
+          <button
+            onClick={() => onAcao({ tipo: "irParaPreventivas" })}
+            style={{
+              background: "#1e293b",
+              border: "1px solid #475569",
+              color: "#94a3b8",
+              fontSize: "11px",
+              fontWeight: 700,
+              padding: "6px 12px",
+              borderRadius: "6px",
+              cursor: "pointer",
+            }}
+          >
+            Ver Plano Geral →
+          </button>
+        </div>
+
+        {alertasPreditivos.length === 0 ? (
+          <p style={{ margin: 0, fontSize: "13px", color: "#94a3b8" }}>
+            Todas as máquinas estão com ritmo de horímetro controlado e revisões a mais de 7 dias de distância.
+          </p>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(260px, 1fr))", gap: "12px" }}>
+            {alertasPreditivos.map((p) => {
+              const corStatus = p.criticidade === "vencida" ? "#ef4444" : p.criticidade === "urgente" ? "#f97316" : "#f59e0b";
+              const labelStatus = p.criticidade === "vencida" ? "VENCIDA" : p.criticidade === "urgente" ? "CRÍTICO (≤ 3 DIAS)" : "ATENÇÃO (≤ 7 DIAS)";
+
+              return (
+                <div
+                  key={p.maquinaId}
+                  style={{
+                    background: "#1e293b",
+                    border: `1px solid ${corStatus}40`,
+                    borderRadius: "8px",
+                    padding: "12px 14px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    gap: "8px"
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{
+                      background: "#0f172a",
+                      color: "#f8fafc",
+                      fontSize: "12px",
+                      fontWeight: 800,
+                      padding: "2px 8px",
+                      borderRadius: "4px",
+                      border: "1px solid #334155"
+                    }}>
+                      {p.tag}
+                    </span>
+                    <span style={{
+                      fontSize: "10px",
+                      fontWeight: 800,
+                      color: corStatus,
+                      background: `${corStatus}20`,
+                      padding: "2px 6px",
+                      borderRadius: "4px"
+                    }}>
+                      {labelStatus}
+                    </span>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: "12px", color: "#cbd5e1", fontWeight: 600 }}>{p.marca} {p.modelo}</div>
+                    <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>
+                      Ritmo: <strong style={{ color: "#94a3b8" }}>{p.ritmoDiario} h/dia</strong> | Restam: <strong style={{ color: "#94a3b8" }}>{p.horasRestantes}h</strong>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    borderTop: "1px solid #334155",
+                    paddingTop: "6px",
+                    fontSize: "11px"
+                  }}>
+                    <span style={{ color: "#64748b" }}>Previsão:</span>
+                    <strong style={{ color: corStatus }}>
+                      {p.criticidade === "vencida" ? "Estourada" : `~ ${p.diasRestantes} dias (${p.dataEstimada})`}
+                    </strong>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Grid Inferior: Ações Imediatas e Confiabilidade da Equipe */}
