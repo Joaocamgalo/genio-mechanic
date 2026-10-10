@@ -1830,7 +1830,7 @@ export default function App() {
             {modoVisualizacao === "kanban" && (
               <KanbanOrdensServico
                 chamados={chamadosVisiveis}
-                usuario={usuario}
+                isAdmin={isAdmin} isMecanico={isMecanico}
                 onAbrirDetalhes={(c) => {
                   setChamadoDetalhes(c);
                   setTela("detalhesChamado");

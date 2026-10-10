@@ -1,9 +1,10 @@
 import React from 'react';
-import type { Chamado, Usuario } from '../types/controlmaq';
+import type { Chamado } from '../types/controlmaq';
 
 interface KanbanOrdensServicoProps {
   chamados?: Chamado[];
-  usuario: Usuario | null;
+  isAdmin: boolean;
+  isMecanico: boolean;
   onAbrirDetalhes: (chamado: Chamado) => void;
   onAssumirChamado: (chamado: Chamado) => void;
   onFinalizarChamado: (chamado: Chamado) => void;
@@ -11,14 +12,12 @@ interface KanbanOrdensServicoProps {
 
 export function KanbanOrdensServico({
   chamados = [],
-  usuario,
+  isAdmin,
+  isMecanico,
   onAbrirDetalhes,
   onAssumirChamado,
   onFinalizarChamado,
 }: KanbanOrdensServicoProps) {
-  const isAdmin = usuario?.perfil === 'admin';
-  const isMecanico = usuario?.perfil === 'mecanico';
-
   const colunas: {
     id: 'Aberto' | 'Assumido' | 'Finalizado';
     titulo: string;
@@ -91,7 +90,7 @@ export function KanbanOrdensServico({
               boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
             }}
           >
-            {/* Header da Coluna */}
+            {/* Cabeçalho da Coluna */}
             <div style={{
               padding: '14px 16px',
               borderBottom: '1px solid #e2e8f0',
@@ -123,7 +122,7 @@ export function KanbanOrdensServico({
               </span>
             </div>
 
-            {/* Lista de Cards da Coluna */}
+            {/* Lista de Registos */}
             <div style={{
               padding: '12px',
               overflowY: 'auto',
@@ -184,7 +183,7 @@ export function KanbanOrdensServico({
                         </span>
                       </div>
 
-                      {/* Informações Operacionais */}
+                      {/* Informações da OS */}
                       <div>
                         {c.cliente && (
                           <div style={{ fontSize: '11px', fontWeight: 800, color: '#2563eb' }}>
@@ -196,7 +195,7 @@ export function KanbanOrdensServico({
                         </div>
                       </div>
 
-                      {/* Descrição do Problema */}
+                      {/* Problema */}
                       <div style={{
                         fontSize: '12px',
                         color: '#334155',
@@ -209,10 +208,9 @@ export function KanbanOrdensServico({
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                       }}>
-                        {c.problema || 'Sem descrição cadastrada'}
+                        {c.problema || 'Sem descrição registada'}
                       </div>
 
-                      {/* Tag de Suprimento */}
                       {precisaPeca && (
                         <div style={{
                           fontSize: '10px',
@@ -227,7 +225,7 @@ export function KanbanOrdensServico({
                         </div>
                       )}
 
-                      {/* Responsável e Data */}
+                      {/* Rodapé do Card */}
                       <div style={{
                         display: 'flex',
                         justifyContent: 'space-between',
@@ -243,7 +241,7 @@ export function KanbanOrdensServico({
                         <span>{formatarData(c.created_at)}</span>
                       </div>
 
-                      {/* Botões de Ação Rápida */}
+                      {/* Ações */}
                       <div style={{
                         display: 'grid',
                         gridTemplateColumns: c.status === 'Aberto' && (isAdmin || isMecanico) ? '1fr 1fr' : '1fr',
