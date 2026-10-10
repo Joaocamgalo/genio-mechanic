@@ -544,6 +544,52 @@ function KpiCard(props: {
   destaque?: boolean;
   onClick?: () => void;
 }) {
+  const temAtencao = props.numero > 0;
+  return (
+    <button
+      type="button"
+      style={{
+        ...styles.kpiCard,
+        borderTop: `3px solid ${props.cor}`,
+        borderLeft: "1px solid #e2e8f0",
+        borderRight: "1px solid #e2e8f0",
+        borderBottom: "1px solid #e2e8f0",
+        borderRadius: "10px",
+        background: temAtencao && props.destaque ? "#fffdfa" : "#ffffff",
+        boxShadow: "0 2px 4px rgba(15, 23, 42, 0.04)",
+        cursor: props.onClick ? "pointer" : "default",
+        textAlign: "left",
+        padding: "16px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "6px",
+        transition: "transform 0.15s ease, box-shadow 0.15s ease"
+      }}
+      onClick={props.onClick}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: props.cor, display: "inline-block" }} />
+          <span style={{ fontSize: "11px", fontWeight: 800, color: "#475569", letterSpacing: "0.5px", textTransform: "uppercase" }}>{props.titulo}</span>
+        </div>
+        <span style={{
+          fontSize: "9px",
+          fontWeight: 800,
+          padding: "2px 6px",
+          borderRadius: "4px",
+          background: temAtencao ? `${props.cor}18` : "#f1f5f9",
+          color: temAtencao ? props.cor : "#64748b"
+        }}>
+          {temAtencao ? "AÇÃO" : "ZERADO"}
+        </span>
+      </div>
+      <strong style={{ fontSize: "28px", fontWeight: 900, color: temAtencao ? props.cor : "#0f172a", lineHeight: "1.1", letterSpacing: "-0.5px" }}>
+        {props.numero}
+      </strong>
+      <span style={{ fontSize: "11px", color: "#64748b", fontWeight: 500 }}>{props.descricao}</span>
+    </button>
+  );
+}) {
   return (
     <button
       type="button"
