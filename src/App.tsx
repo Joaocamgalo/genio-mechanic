@@ -9,6 +9,8 @@ import { supabase } from './lib/supabase';
 import { StatusConexao } from './components/StatusConexao';
 import { ModalFichaTecnica } from './components/ModalFichaTecnica';
 import { ModalRequisicaoCompras } from './components/ModalRequisicaoCompras';
+import { ModalConcluirOSAssistido } from './components/ModalConcluirOSAssistido';
+import { ModalDesmobilizacao } from './components/ModalDesmobilizacao';
 import { KanbanOrdensServico } from './components/KanbanOrdensServico';
 import {
   getConnectivitySnapshot,
@@ -149,6 +151,8 @@ export default function App() {
   const [maquinaDossie, setMaquinaDossie] = useState<Maquina | null>(null);
   const [maquinaFichaTecnica, setMaquinaFichaTecnica] = useState<Maquina | null>(null);
   const [maquinaRequisicao, setMaquinaRequisicao] = useState<Maquina | null>(null);
+  const [maquinaDesmobilizar, setMaquinaDesmobilizar] = useState<Maquina | null>(null);
+  const [chamadoConcluirAssistido, setChamadoConcluirAssistido] = useState<Chamado | null>(null);
   const [modoVisualizacaoOS, setModoVisualizacaoOS] = useState<'kanban' | 'lista'>('kanban');
 
   const [leiturasLote, setLeiturasLote] = useState<Record<string, string>>({});
@@ -1631,6 +1635,20 @@ export default function App() {
                       >
                         📦 Pedido / Lead Time
                       </button>
+                      {isAdmin && (
+                        <button
+                          onClick={() => setMaquinaDesmobilizar(maquina)}
+                          style={{
+                            ...estilos.botaoHistorico,
+                            background: "#7c2d12",
+                            color: "#fdba74",
+                            border: "1px solid #ea580c",
+                            fontWeight: 800
+                          }}
+                        >
+                          🚚 Desmobilizar
+                        </button>
+                      )}
                     </div>
 
                     {isAdmin && (
@@ -1674,6 +1692,23 @@ export default function App() {
         )}
 
         {/* DOSSIÊ MODAL */}
+        {chamadoConcluirAssistido && (
+          <ModalConcluirOSAssistido
+            chamado={chamadoConcluirAssistido}
+            maquina={maquinas.find((m) => m.tag === chamadoConcluirAssistido.maquina)}
+            fechar={() => setChamadoConcluirAssistido(null)}
+            onSucesso={() => {
+              carregarChamados();
+              carregarMaquinas();
+            }}
+          />
+        )}
+        {maquinaDesmobilizar && (
+          <ModalDesmobilizacao
+            maquina={maquinaDesmobilizar}
+            fechar={() => setMaquinaDesmobilizar(null)}
+          />
+        )}
         {maquinaRequisicao && (
           <ModalRequisicaoCompras
             maquina={maquinaRequisicao}
@@ -1862,7 +1897,7 @@ export default function App() {
                     assumirChamado(c);
                   }
                 }}
-                onFinalizarChamado={(c) => abrirTelaFinalizar(c.id)}
+                onFinalizarChamado={(c) => setChamadoConcluirAssistido(c)}
               />
             )}
           </div>
