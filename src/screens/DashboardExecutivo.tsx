@@ -390,10 +390,22 @@ export function DashboardExecutivo({
               <h3 style={styles.cardTitulo}>Central de Resolução Rápida</h3>
             </div>
             <button
-              onClick={() => onAcao({ tipo: 'novoChamado' })}
-              style={styles.botaoAbrirOS}
+              onClick={() => onAcao({ tipo: "novoChamado" })}
+              style={{
+                ...styles.botaoAbrirOS,
+                background: "#0f172a",
+                border: "1px solid #f59e0b",
+                color: "#f59e0b",
+                fontWeight: 800,
+                fontSize: "12px",
+                letterSpacing: "0.5px",
+                padding: "8px 16px",
+                borderRadius: "8px",
+                cursor: "pointer",
+                boxShadow: "0 2px 4px rgba(15, 23, 42, 0.1)",
+              }}
             >
-              + Nova OS
+              + NOVA OS
             </button>
           </div>
 
@@ -449,25 +461,61 @@ export function DashboardExecutivo({
                     key={m.id}
                     style={{
                       ...styles.linhaAlertaMaquina,
-                      flexDirection: isMobile ? 'column' : 'row',
-                      alignItems: isMobile ? 'flex-start' : 'center',
-                      gap: isMobile ? '8px' : '0',
+                      flexDirection: isMobile ? "column" : "row",
+                      alignItems: isMobile ? "flex-start" : "center",
+                      justifyContent: "space-between",
+                      gap: isMobile ? "10px" : "12px",
+                      background: "#ffffff",
+                      border: "1px solid #fee2e2",
+                      borderLeft: "3px solid #dc2626",
+                      borderRadius: "8px",
+                      padding: "10px 14px",
+                      boxShadow: "0 1px 2px rgba(220, 38, 38, 0.05)",
                     }}
                   >
-                    <div>
-                      <strong style={{ color: '#dc2626' }}>{m.tag}</strong>
-                      <span style={{ fontSize: '12px', color: '#64748b', marginLeft: isMobile ? '0' : '8px', display: isMobile ? 'block' : 'inline' }}>
-                        {m.marca} {m.modelo} (Equipamento Parado)
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                      <span style={{
+                        background: "#0f172a",
+                        color: "#f87171",
+                        fontSize: "11px",
+                        fontWeight: 800,
+                        letterSpacing: "0.5px",
+                        padding: "3px 8px",
+                        borderRadius: "4px",
+                        border: "1px solid #334155"
+                      }}>
+                        {m.tag}
+                      </span>
+                      <span style={{ fontSize: "12px", color: "#334155", fontWeight: 600 }}>
+                        {m.marca} {m.modelo}
+                      </span>
+                      <span style={{
+                        fontSize: "10px",
+                        color: "#dc2626",
+                        background: "#fef2f2",
+                        padding: "2px 6px",
+                        borderRadius: "4px",
+                        fontWeight: 700
+                      }}>
+                        PARADA
                       </span>
                     </div>
                     <button
-                      onClick={() => onAcao({ tipo: 'irParaMaquinas' })}
+                      onClick={() => onAcao({ tipo: "irParaMaquinas" })}
                       style={{
                         ...styles.botaoAcaoLinha,
-                        width: isMobile ? '100%' : 'auto',
+                        width: isMobile ? "100%" : "auto",
+                        background: "#f8fafc",
+                        border: "1px solid #cbd5e1",
+                        color: "#0f172a",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        padding: "6px 12px",
+                        borderRadius: "6px",
+                        cursor: "pointer",
                       }}
                     >
-                      Acessar Ativo
+                      Aceder Ativo →
                     </button>
                   </div>
                 ))
