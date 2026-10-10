@@ -529,31 +529,48 @@ export function DashboardExecutivo({
           <span style={styles.preTitulo}>Eficiência Técnica</span>
           <h3 style={styles.cardTitulo}>Rendimento da Manutenção</h3>
 
-          <div style={styles.statusResumo}>
-            <div style={styles.statusResumoItem}>
-              <span style={styles.statusResumoNumero}>{chamadosAbertos.length}</span>
-              <span style={styles.statusResumoLabel}>Abertos</span>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: "8px",
+            background: "#f8fafc",
+            padding: "12px",
+            borderRadius: "8px",
+            border: "1px solid #e2e8f0",
+            marginBottom: "14px"
+          }}>
+            <div style={{ textAlign: "center" }}>
+              <span style={{ fontSize: "10px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px", display: "block" }}>ABERTOS</span>
+              <strong style={{ fontSize: "20px", fontWeight: 900, color: chamadosAbertos.length > 0 ? "#ef4444" : "#0f172a" }}>{chamadosAbertos.length}</strong>
             </div>
-            <div style={styles.statusResumoItem}>
-              <span style={styles.statusResumoNumero}>{chamadosAssumidos.length}</span>
-              <span style={styles.statusResumoLabel}>Em Reparo</span>
+            <div style={{ textAlign: "center", borderLeft: "1px solid #e2e8f0", borderRight: "1px solid #e2e8f0" }}>
+              <span style={{ fontSize: "10px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px", display: "block" }}>EM REPARO</span>
+              <strong style={{ fontSize: "20px", fontWeight: 900, color: "#2563eb" }}>{chamadosAssumidos.length}</strong>
             </div>
-            <div style={styles.statusResumoItem}>
-              <span style={{ ...styles.statusResumoNumero, color: '#16a34a' }}>
-                {chamadosFinalizados.length}
-              </span>
-              <span style={styles.statusResumoLabel}>Concluídos</span>
+            <div style={{ textAlign: "center" }}>
+              <span style={{ fontSize: "10px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px", display: "block" }}>CONCLUÍDOS</span>
+              <strong style={{ fontSize: "20px", fontWeight: 900, color: "#16a34a" }}>{chamadosFinalizados.length}</strong>
             </div>
           </div>
 
-          <div style={styles.tempoMedioBox}>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            background: "#0f172a",
+            color: "#ffffff",
+            padding: "12px 16px",
+            borderRadius: "8px",
+            borderLeft: "3px solid #38bdf8",
+            marginBottom: "14px"
+          }}>
             <div>
-              <span style={{ fontSize: '11px', color: '#1e40af', fontWeight: 700, textTransform: 'uppercase', display: 'block' }}>
-                Tempo Médio de Reparo (MTTR)
+              <span style={{ fontSize: "10px", color: "#38bdf8", fontWeight: 800, letterSpacing: "0.5px", textTransform: "uppercase", display: "block" }}>
+                TELEMETRIA DE EFICIÊNCIA // MTTR
               </span>
-              <span style={{ fontSize: '13px', color: '#334155' }}>Duração média por atendimento</span>
+              <span style={{ fontSize: "12px", color: "#94a3b8" }}>Tempo Médio de Resolução</span>
             </div>
-            <strong style={{ fontSize: '20px', color: '#1e3a8a' }}>
+            <strong style={{ fontSize: "20px", fontWeight: 900, color: "#f8fafc", letterSpacing: "-0.5px" }}>
               {formatarDuracao(tempoMedioGeral)}
             </strong>
           </div>

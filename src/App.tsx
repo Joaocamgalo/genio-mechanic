@@ -1470,28 +1470,70 @@ export default function App() {
         {/* TELA 2: FROTA DE MÁQUINAS */}
         {tela === 'maquinas' && (
           <div>
-            <div style={{ ...estilos.cabecalhoPagina, flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'flex-end', gap: isMobile ? '10px' : '0' }}>
+            <div style={{
+              ...estilos.cabecalhoPagina,
+              flexDirection: isMobile ? "column" : "row",
+              alignItems: isMobile ? "stretch" : "flex-end",
+              gap: isMobile ? "12px" : "0",
+              background: "#ffffff",
+              padding: "16px 20px",
+              borderRadius: "10px",
+              border: "1px solid #e2e8f0",
+              borderLeft: "4px solid #f59e0b",
+              boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+              marginBottom: "16px"
+            }}>
               <div>
-                <span style={estilos.preTitulo}>Inventário</span>
-                <h2 style={estilos.tituloSecao}>Frota de Máquinas</h2>
+                <span style={{ fontSize: "11px", fontWeight: 800, color: "#64748b", letterSpacing: "1px", textTransform: "uppercase" }}>
+                  INVENTÁRIO TÉCNICO // ATIVOS
+                </span>
+                <h2 style={{ fontSize: "22px", fontWeight: 900, color: "#0f172a", margin: "4px 0 0 0", letterSpacing: "-0.5px" }}>
+                  Frota de Equipamentos
+                </h2>
               </div>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 {isAdmin && (
                   <>
                     <button
                       onClick={() =>
                         exportarParaCsv(
-                          'Frota_Lokmax',
-                          ['TAG', 'Marca', 'Modelo', 'Horímetro', 'Status'],
+                          "Frota_GenioMechaniq",
+                          ["TAG", "Marca", "Modelo", "Horímetro", "Status"],
                           maquinas.map((m) => [m.tag, m.marca, m.modelo, m.horimetro ?? 0, m.status_maquina])
                         )
                       }
-                      style={estilos.botaoExportarCsv}
+                      style={{
+                        background: "#f1f5f9",
+                        border: "1px solid #cbd5e1",
+                        color: "#334155",
+                        fontWeight: 700,
+                        fontSize: "12px",
+                        padding: "8px 14px",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px"
+                      }}
                     >
-                      📥 CSV
+                      📥 EXPORTAR CSV
                     </button>
-                    <button onClick={() => { setMaquinaEmEdicao(null); setModalNovaMaquina(true); }} style={estilos.botaoNovo}>
-                      + Nova Máquina
+                    <button
+                      onClick={() => { setMaquinaEmEdicao(null); setModalNovaMaquina(true); }}
+                      style={{
+                        background: "#0f172a",
+                        border: "1px solid #f59e0b",
+                        color: "#f59e0b",
+                        fontWeight: 800,
+                        fontSize: "12px",
+                        letterSpacing: "0.5px",
+                        padding: "8px 16px",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        boxShadow: "0 2px 4px rgba(15, 23, 42, 0.1)"
+                      }}
+                    >
+                      + CADASTRAR MÁQUINA
                     </button>
                   </>
                 )}
