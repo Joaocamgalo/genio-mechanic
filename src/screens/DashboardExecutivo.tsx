@@ -155,9 +155,20 @@ export function DashboardExecutivo({
           gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.4fr) minmax(320px, 0.6fr)',
         }}
       >
-        <div style={{ ...styles.heroCard, padding: isMobile ? '18px' : '28px' }}>
+        <div style={{
+          ...styles.heroCard,
+          padding: isMobile ? "20px" : "28px",
+          background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)",
+          border: "1px solid #e2e8f0",
+          borderLeft: "4px solid #f59e0b",
+          borderRadius: "12px",
+          boxShadow: "0 4px 6px -1px rgba(15, 23, 42, 0.05)"
+        }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <span style={styles.tagEmpresa}>GE-NIO MECHANIQ</span>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "#0f172a", color: "#f59e0b", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 800, letterSpacing: "1px" }}>
+              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#f59e0b" }}></span>
+              GE-NIO MECHANIQ
+            </div>
           </div>
           <h2 style={{ ...styles.heroTitulo, fontSize: isMobile ? '20px' : '26px' }}>
             Painel Técnico de Operações
@@ -187,7 +198,14 @@ export function DashboardExecutivo({
         </div>
 
         {/* Card de Confiabilidade / Disponibilidade da Frota */}
-        <div style={{ ...styles.statusGeralCard, padding: isMobile ? '18px' : '24px' }}>
+        <div style={{
+          ...styles.statusGeralCard,
+          padding: isMobile ? "20px" : "24px",
+          background: "#ffffff",
+          border: "1px solid #e2e8f0",
+          borderRadius: "12px",
+          boxShadow: "0 4px 6px -1px rgba(15, 23, 42, 0.05)"
+        }}>
           <div style={styles.statusGeralTopo}>
             <span style={styles.statusGeralTitulo}>Disponibilidade da Frota</span>
             <span
