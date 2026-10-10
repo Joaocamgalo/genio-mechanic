@@ -8,6 +8,7 @@ import {
 import { supabase } from './lib/supabase';
 import { StatusConexao } from './components/StatusConexao';
 import { ModalFichaTecnica } from './components/ModalFichaTecnica';
+import { KanbanOrdensServico } from './components/KanbanOrdensServico';
 import {
   getConnectivitySnapshot,
   subscribeConnectivity,
@@ -146,6 +147,7 @@ export default function App() {
   const [maquinaEmEdicao, setMaquinaEmEdicao] = useState<Maquina | null>(null);
   const [maquinaDossie, setMaquinaDossie] = useState<Maquina | null>(null);
   const [maquinaFichaTecnica, setMaquinaFichaTecnica] = useState<Maquina | null>(null);
+  const [modoVisualizacaoOS, setModoVisualizacaoOS] = useState<'kanban' | 'lista'>('kanban');
 
   const [leiturasLote, setLeiturasLote] = useState<Record<string, string>>({});
   const [buscaUsuarios, setBuscaUsuarios] = useState('');
@@ -1825,42 +1827,23 @@ export default function App() {
               </div>
             )}
 
-            {modoVisualizacao === 'kanban' && isAdmin && (
-              <div className="kanban-grid">
-                <div className="kanban-coluna">
-                  <strong>🔴 Abertos ({chamadosAbertos.length})</strong>
-                  {chamadosAbertos.map((c) => (
-                    <div key={c.id} className="cm-card" style={{ padding: '10px' }}>
-                      <div style={{ fontWeight: 700 }}>{c.maquina}</div>
-                      <p style={{ fontSize: '12px', margin: '4px 0 8px' }}>{c.problema}</p>
-                      <button onClick={() => designarMecanicoAdmin(c.id)} style={estilos.botaoCardPrincipal}>Designar Mecânico</button>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="kanban-coluna">
-                  <strong>🟡 Em Atendimento ({chamadosAssumidos.length})</strong>
-                  {chamadosAssumidos.map((c) => (
-                    <div key={c.id} className="cm-card" style={{ padding: '10px' }}>
-                      <div style={{ fontWeight: 700 }}>{c.maquina}</div>
-                      <p style={{ fontSize: '12px', margin: '4px 0 8px' }}>{c.problema}</p>
-                      <small style={{ color: '#0f172a', fontWeight: 600, display: 'block', marginBottom: '6px' }}>🔧 {c.mecanico}</small>
-                      <button onClick={() => abrirTelaFinalizar(c.id)} style={{ ...estilos.botaoCardPrincipal, background: '#16a34a' }}>Concluir</button>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="kanban-coluna">
-                  <strong>🟢 Concluídos ({chamadosFinalizados.length})</strong>
-                  {chamadosFinalizados.map((c) => (
-                    <div key={c.id} className="cm-card" style={{ padding: '10px' }}>
-                      <div style={{ fontWeight: 700 }}>{c.maquina}</div>
-                      <p style={{ fontSize: '12px', margin: '4px 0 8px' }}>{c.problema}</p>
-                      <button onClick={() => gerarPdfChamado(c)} style={estilos.botaoCardPrincipal}>PDF</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            {modoVisualizacao === "kanban" && (
+              <KanbanOrdensServico
+                chamados={chamadosVisiveis}
+                usuario={usuario}
+                onAbrirDetalhes={(c) => {
+                  setChamadoDetalhes(c);
+                  setTela("detalhesChamado");
+                }}
+                onAssumirChamado={(c) => {
+                  if (isAdmin) {
+                    designarMecanicoAdmin(c.id);
+                  } else {
+                    assumirChamado(c);
+                  }
+                }}
+                onFinalizarChamado={(c) => abrirTelaFinalizar(c.id)}
+              />
             )}
           </div>
         )}
