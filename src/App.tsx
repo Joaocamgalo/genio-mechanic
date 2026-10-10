@@ -8,6 +8,7 @@ import {
 import { supabase } from './lib/supabase';
 import { StatusConexao } from './components/StatusConexao';
 import { ModalFichaTecnica } from './components/ModalFichaTecnica';
+import { ModalRequisicaoCompras } from './components/ModalRequisicaoCompras';
 import { KanbanOrdensServico } from './components/KanbanOrdensServico';
 import {
   getConnectivitySnapshot,
@@ -147,6 +148,7 @@ export default function App() {
   const [maquinaEmEdicao, setMaquinaEmEdicao] = useState<Maquina | null>(null);
   const [maquinaDossie, setMaquinaDossie] = useState<Maquina | null>(null);
   const [maquinaFichaTecnica, setMaquinaFichaTecnica] = useState<Maquina | null>(null);
+  const [maquinaRequisicao, setMaquinaRequisicao] = useState<Maquina | null>(null);
   const [modoVisualizacaoOS, setModoVisualizacaoOS] = useState<'kanban' | 'lista'>('kanban');
 
   const [leiturasLote, setLeiturasLote] = useState<Record<string, string>>({});
@@ -1617,6 +1619,18 @@ export default function App() {
                       >
                         ⚙ Peças & Filtros
                       </button>
+                      <button
+                        onClick={() => setMaquinaRequisicao(maquina)}
+                        style={{
+                          ...estilos.botaoHistorico,
+                          background: "#1e3a8a",
+                          color: "#93c5fd",
+                          border: "1px solid #3b82f6",
+                          fontWeight: 800
+                        }}
+                      >
+                        📦 Pedido / Lead Time
+                      </button>
                     </div>
 
                     {isAdmin && (
@@ -1660,6 +1674,12 @@ export default function App() {
         )}
 
         {/* DOSSIÊ MODAL */}
+        {maquinaRequisicao && (
+          <ModalRequisicaoCompras
+            maquina={maquinaRequisicao}
+            fechar={() => setMaquinaRequisicao(null)}
+          />
+        )}
         {maquinaFichaTecnica && (
           <ModalFichaTecnica
             maquina={maquinaFichaTecnica}
