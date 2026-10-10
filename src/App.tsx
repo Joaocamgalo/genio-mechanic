@@ -2360,17 +2360,62 @@ function Topo(props: {
         className="controlmaq-topbar"
         style={{
           ...estilos.topo,
-          left: props.isMobile ? 0 : '260px',
-          width: props.isMobile ? '100%' : 'calc(100% - 260px)',
+          left: props.isMobile ? 0 : "260px",
+          width: props.isMobile ? "100%" : "calc(100% - 260px)",
+          padding: props.isMobile ? "0 16px" : "0 24px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.2)",
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           {props.isMobile && (
             <button onClick={() => setMenuAberto(!menuAberto)} style={estilos.botaoMenuMobile}>☰</button>
           )}
-          <span style={{ fontWeight: 900, color: '#f59e0b' }}>Ge-Nio Mechaniq</span>
+          {props.isMobile ? (
+            <span style={{ fontWeight: 900, color: "#f59e0b", fontSize: "16px" }}>Ge-Nio Mechaniq</span>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{
+                background: "#1e293b",
+                color: "#f59e0b",
+                fontSize: "10px",
+                fontWeight: 800,
+                letterSpacing: "1px",
+                padding: "4px 8px",
+                borderRadius: "4px",
+                border: "1px solid #334155"
+              }}>
+                CONSOLE OPERACIONAL
+              </span>
+              <span style={{ color: "#475569", fontSize: "12px" }}>//</span>
+              <span style={{ fontSize: "13px", fontWeight: 700, color: "#94a3b8", letterSpacing: "0.5px" }}>
+                MONITORAMENTO DE FROTA & MANUTENÇÃO
+              </span>
+            </div>
+          )}
         </div>
-        <StatusConexao />
+
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          {!props.isMobile && (
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              background: "#1e293b",
+              padding: "4px 10px",
+              borderRadius: "6px",
+              border: "1px solid #334155",
+              fontSize: "11px",
+              color: "#94a3b8"
+            }}>
+              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#10b981" }} />
+              OPERADOR: <strong style={{ color: "#f8fafc", textTransform: "uppercase" }}>{props.usuario?.nome || props.usuario?.tipo || "ADMIN"}</strong>
+            </div>
+          )}
+          <StatusConexao />
+        </div>
       </header>
     </>
   );
