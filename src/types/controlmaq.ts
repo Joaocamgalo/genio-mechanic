@@ -156,3 +156,17 @@ export type HistoricoPreventiva = {
   registrado_por: string | null;
   created_at?: string;
 };
+
+export type ItemManutencaoPreventiva = {
+  id: number;
+  maquina_id: number;
+  intervalo_horas: number;
+  componente: string;
+  codigo_original: string | null;
+  equivalente_mann: string | null;
+  equivalente_donaldson: string | null;
+  equivalente_baldwin: string | null;
+  equivalente_racor: string | null;
+  capacidade_oleo: string | null;
+  created_at?: string;
+};

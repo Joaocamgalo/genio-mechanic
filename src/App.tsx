@@ -7,6 +7,7 @@ import {
 } from 'react';
 import { supabase } from './lib/supabase';
 import { StatusConexao } from './components/StatusConexao';
+import { ModalFichaTecnica } from './components/ModalFichaTecnica';
 import {
   getConnectivitySnapshot,
   subscribeConnectivity,
@@ -144,6 +145,7 @@ export default function App() {
   const [modalNovaMaquina, setModalNovaMaquina] = useState(false);
   const [maquinaEmEdicao, setMaquinaEmEdicao] = useState<Maquina | null>(null);
   const [maquinaDossie, setMaquinaDossie] = useState<Maquina | null>(null);
+  const [maquinaFichaTecnica, setMaquinaFichaTecnica] = useState<Maquina | null>(null);
 
   const [leiturasLote, setLeiturasLote] = useState<Record<string, string>>({});
   const [buscaUsuarios, setBuscaUsuarios] = useState('');
@@ -1601,6 +1603,18 @@ export default function App() {
                       <button onClick={() => setMaquinaDossie(maquina)} style={estilos.botaoHistorico}>
                         📋 Dossiê
                       </button>
+                      <button
+                        onClick={() => setMaquinaFichaTecnica(maquina)}
+                        style={{
+                          ...estilos.botaoHistorico,
+                          background: "#0f172a",
+                          color: "#f59e0b",
+                          border: "1px solid #334155",
+                          fontWeight: 800
+                        }}
+                      >
+                        ⚙ Peças & Filtros
+                      </button>
                     </div>
 
                     {isAdmin && (
@@ -1644,6 +1658,13 @@ export default function App() {
         )}
 
         {/* DOSSIÊ MODAL */}
+        {maquinaFichaTecnica && (
+          <ModalFichaTecnica
+            maquina={maquinaFichaTecnica}
+            fechar={() => setMaquinaFichaTecnica(null)}
+            isAdmin={isAdmin}
+          />
+        )}
         {maquinaDossie && (
           <div style={estilos.modalOverlay}>
             <div style={{ ...estilos.modalCard, width: isMobile ? '95vw' : '100%', maxWidth: '650px', maxHeight: '85vh', overflowY: 'auto', padding: isMobile ? '16px' : '24px' }}>
