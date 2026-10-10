@@ -8,7 +8,6 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
-      includeAssets: ['favicon.ico', 'vite.svg'],
       manifest: {
         name: 'ControlMaq - Gestão de Manutenção',
         short_name: 'ControlMaq',
@@ -21,9 +20,15 @@ export default defineConfig({
         scope: '/',
         icons: [
           {
-            src: '/vite.svg',
-            sizes: '192x192 512x512',
-            type: 'image/svg+xml',
+            src: '/icon-192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: '/icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
             purpose: 'any maskable'
           }
         ]
