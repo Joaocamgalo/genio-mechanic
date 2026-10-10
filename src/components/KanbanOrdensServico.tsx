@@ -2,7 +2,7 @@ import React from 'react';
 import type { Chamado, Usuario } from '../types/controlmaq';
 
 interface KanbanOrdensServicoProps {
-  chamados: Chamado[];
+  chamados?: Chamado[];
   usuario: Usuario | null;
   onAbrirDetalhes: (chamado: Chamado) => void;
   onAssumirChamado: (chamado: Chamado) => void;
@@ -10,7 +10,7 @@ interface KanbanOrdensServicoProps {
 }
 
 export function KanbanOrdensServico({
-  chamados,
+  chamados = [],
   usuario,
   onAbrirDetalhes,
   onAssumirChamado,
@@ -55,9 +55,16 @@ export function KanbanOrdensServico({
 
   function formatarData(dataStr?: string) {
     if (!dataStr) return '';
-    const d = new Date(dataStr);
-    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    try {
+      const d = new Date(dataStr);
+      if (isNaN(d.getTime())) return '';
+      return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '';
+    }
   }
+
+  const listaSegura = Array.isArray(chamados) ? chamados : [];
 
   return (
     <div style={{
@@ -68,7 +75,7 @@ export function KanbanOrdensServico({
       marginTop: '16px',
     }}>
       {colunas.map((col) => {
-        const chamadosColuna = chamados.filter((c) => c.status === col.id);
+        const chamadosColuna = listaSegura.filter((c) => c && c.status === col.id);
 
         return (
           <div
@@ -138,10 +145,13 @@ export function KanbanOrdensServico({
                 </div>
               ) : (
                 chamadosColuna.map((c) => {
-                  const precisaPeca = c.problema?.toLowerCase().includes('filtro') ||
-                                      c.problema?.toLowerCase().includes('peça') ||
-                                      c.problema?.toLowerCase().includes('vazamento') ||
-                                      c.solucao?.toLowerCase().includes('aguardando');
+                  const prob = (c.problema || '').toLowerCase();
+                  const sol = (c.solucao || '').toLowerCase();
+                  const precisaPeca = prob.includes('filtro') ||
+                                      prob.includes('peça') ||
+                                      prob.includes('peca') ||
+                                      prob.includes('vazamento') ||
+                                      sol.includes('aguardando');
 
                   return (
                     <div
@@ -167,7 +177,7 @@ export function KanbanOrdensServico({
                           padding: '2px 8px',
                           borderRadius: '4px',
                         }}>
-                          {c.maquina}
+                          {c.maquina || 'SEM TAG'}
                         </span>
                         <span style={{ fontSize: '11px', fontWeight: 700, color: '#64748b' }}>
                           OS #{c.id}
@@ -199,10 +209,10 @@ export function KanbanOrdensServico({
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                       }}>
-                        {c.problema}
+                        {c.problema || 'Sem descrição cadastrada'}
                       </div>
 
-                      {/* Tag de Suprimento se detectar necessidade de peça */}
+                      {/* Tag de Suprimento */}
                       {precisaPeca && (
                         <div style={{
                           fontSize: '10px',
@@ -241,6 +251,7 @@ export function KanbanOrdensServico({
                         marginTop: '4px',
                       }}>
                         <button
+                          type="button"
                           onClick={() => onAbrirDetalhes(c)}
                           style={{
                             background: '#f1f5f9',
@@ -258,6 +269,7 @@ export function KanbanOrdensServico({
 
                         {c.status === 'Aberto' && (isAdmin || isMecanico) && (
                           <button
+                            type="button"
                             onClick={() => onAssumirChamado(c)}
                             style={{
                               background: '#2563eb',
@@ -276,6 +288,7 @@ export function KanbanOrdensServico({
 
                         {c.status === 'Assumido' && (isAdmin || isMecanico) && (
                           <button
+                            type="button"
                             onClick={() => onFinalizarChamado(c)}
                             style={{
                               background: '#16a34a',
