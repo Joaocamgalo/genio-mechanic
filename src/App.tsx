@@ -867,32 +867,50 @@ export default function App() {
   }
 
   async function salvarHorimetrosEmLote() {
-    const alteracoes = Object.entries(leiturasLote).filter(([_, valor]) => valor && valor.trim() !== '');
+    const alteracoes = Object.entries(leiturasLote).filter(([_, valor]) => valor && String(valor).trim() !== "");
     if (alteracoes.length === 0) {
-      alert('Preencha pelo menos um horímetro.');
+      alert("Preencha pelo menos um horímetro.");
       return;
     }
 
     try {
       setSalvando(true);
       for (const [maquinaId, novoValorStr] of alteracoes) {
-        const valor = Number(novoValorStr.replace(',', '.'));
-        const maquinaAlvo = maquinas.find((m) => m.id === maquinaId);
+        const valor = Number(String(novoValorStr).replace(",", "."));
+        const maquinaAlvo = maquinas.find((m) => String(m.id) === String(maquinaId));
         if (Number.isFinite(valor) && valor >= 0 && maquinaAlvo) {
-          await supabase.from('maquinas').update({ horimetro: valor }).eq('id', maquinaId);
-          await supabase.from('leituras_horimetro').insert({
-            maquina_id: maquinaId,
+          const { error: errMaq } = await supabase
+            .from("maquinas")
+            .update({ horimetro: valor })
+            .eq("id", maquinaAlvo.id);
+
+          if (errMaq) throw new Error(`Erro ao atualizar máquina ${maquinaAlvo.tag}: ${errMaq.message}`);
+
+          const payloadLeitura: any = {
+            maquina_id: maquinaAlvo.id,
             maquina_tag: maquinaAlvo.tag,
-            operador_id: String(usuarioLogado?.id),
-            operador_nome: usuarioLogado?.nome,
             horimetro: valor,
-            origem: 'apontamento_em_lote',
-          });
+            origem: "apontamento_em_lote",
+          };
+
+          if (usuarioLogado?.id) payloadLeitura.operador_id = usuarioLogado.id;
+          if (usuarioLogado?.nome) payloadLeitura.operador_nome = usuarioLogado.nome;
+
+          const { error: errLeitura } = await supabase
+            .from("leituras_horimetro")
+            .insert(payloadLeitura);
+
+          if (errLeitura) {
+            console.warn("Aviso ao salvar histórico de leitura:", errLeitura.message);
+          }
         }
       }
       setLeiturasLote({});
       await carregarDados(false);
-      alert('Horímetros gravados com sucesso!');
+      alert("Horímetro(s) atualizado(s) com sucesso!");
+    } catch (err: any) {
+      console.error(err);
+      alert("Falha ao salvar horímetro: " + (err.message || err));
     } finally {
       setSalvando(false);
     }
