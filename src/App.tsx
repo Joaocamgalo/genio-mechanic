@@ -11,6 +11,9 @@ import { ModalFichaTecnica } from './components/ModalFichaTecnica';
 import { ModalRequisicaoCompras } from './components/ModalRequisicaoCompras';
 import { ModalConcluirOSAssistido } from './components/ModalConcluirOSAssistido';
 import { ModalDesmobilizacao } from './components/ModalDesmobilizacao';
+import { AlertaWhatsAppPreventivas } from './components/AlertaWhatsAppPreventivas';
+import { ModalAuditoriaHomologacao } from './components/ModalAuditoriaHomologacao';
+import { OfflineCache } from './services/offlineCacheService';
 import { imprimirOuSalvarLaudoTecnico } from './services/relatorioOSService';
 import { KanbanOrdensServico } from './components/KanbanOrdensServico';
 import {
@@ -153,6 +156,7 @@ export default function App() {
   const [maquinaFichaTecnica, setMaquinaFichaTecnica] = useState<Maquina | null>(null);
   const [maquinaRequisicao, setMaquinaRequisicao] = useState<Maquina | null>(null);
   const [maquinaDesmobilizar, setMaquinaDesmobilizar] = useState<Maquina | null>(null);
+  const [modalAuditoriaAberto, setModalAuditoriaAberto] = useState(false);
   const [chamadoConcluirAssistido, setChamadoConcluirAssistido] = useState<Chamado | null>(null);
   const [modoVisualizacaoOS, setModoVisualizacaoOS] = useState<'kanban' | 'lista'>('kanban');
 
@@ -1720,6 +1724,13 @@ export default function App() {
               carregarChamados();
               carregarMaquinas();
             }}
+          />
+        )}
+        {modalAuditoriaAberto && (
+          <ModalAuditoriaHomologacao
+            maquinas={maquinas}
+            chamados={chamados}
+            fechar={() => setModalAuditoriaAberto(false)}
           />
         )}
         {maquinaDesmobilizar && (
