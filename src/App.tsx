@@ -1456,7 +1456,32 @@ export default function App() {
 
         {/* TELA 1: DASHBOARD EXECUTIVO */}
         {tela === 'dashboard' && isAdmin && (
-          <DashboardExecutivo chamados={chamados}
+          <>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "12px" }}>
+              <button
+                type="button"
+                onClick={() => setModalAuditoriaAberto(true)}
+                style={{
+                  background: "#0f172a",
+                  color: "#93c5fd",
+                  border: "1px solid #334155",
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                }}
+              >
+                🛠 Painel de Auditoria & Homologação
+              </button>
+            </div>
+            <AlertaWhatsAppPreventivas preventivas={preventivas} maquinas={maquinas} />
+            <div style={{ marginBottom: "16px" }} />
+            <DashboardExecutivo chamados={chamados}
             usuario={usuarioLogado}
             chamados={chamadosVisiveis}
             maquinas={maquinas}
@@ -1498,6 +1523,7 @@ export default function App() {
               })
             }
           />
+          </>
         )}
 
         {/* TELA 2: FROTA DE MÁQUINAS */}
