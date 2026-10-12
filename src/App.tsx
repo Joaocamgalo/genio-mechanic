@@ -11,6 +11,7 @@ import { ModalFichaTecnica } from './components/ModalFichaTecnica';
 import { ModalRequisicaoCompras } from './components/ModalRequisicaoCompras';
 import { ModalConcluirOSAssistido } from './components/ModalConcluirOSAssistido';
 import { ModalDesmobilizacao } from './components/ModalDesmobilizacao';
+import { imprimirOuSalvarLaudoTecnico } from './services/relatorioOSService';
 import { KanbanOrdensServico } from './components/KanbanOrdensServico';
 import {
   getConnectivitySnapshot,
@@ -1433,7 +1434,7 @@ export default function App() {
 
         {/* TELA 1: DASHBOARD EXECUTIVO */}
         {tela === 'dashboard' && isAdmin && (
-          <DashboardExecutivo
+          <DashboardExecutivo chamados={chamados}
             usuario={usuarioLogado}
             chamados={chamadosVisiveis}
             maquinas={maquinas}
@@ -2002,7 +2003,25 @@ export default function App() {
             <p><strong>Problema:</strong> {chamadoDetalhes.problema}</p>
             {chamadoDetalhes.diagnostico_tecnico && <p><strong>Diagnóstico:</strong> {chamadoDetalhes.diagnostico_tecnico}</p>}
             {chamadoDetalhes.solucao && <p><strong>Solução:</strong> {chamadoDetalhes.solucao}</p>}
-            <button onClick={() => gerarPdfChamado(chamadoDetalhes)} style={estilos.botaoNovoSubmit}>📄 Gerar PDF Completo</button>
+            <div style={{ display: "flex", gap: "10px", marginTop: "14px" }}>
+              <button
+                type="button"
+                onClick={() => {
+                  const m = maquinas.find((x) => x.tag === chamadoDetalhes.maquina);
+                  imprimirOuSalvarLaudoTecnico(chamadoDetalhes, m);
+                }}
+                style={{ ...estilos.botaoNovoSubmit, background: "#0f172a" }}
+              >
+                🖨 Imprimir / Salvar Laudo Técnico
+              </button>
+              <button
+                type="button"
+                onClick={() => gerarPdfChamado(chamadoDetalhes)}
+                style={estilos.botaoNovoSubmit}
+              >
+                📄 PDF Resumido
+              </button>
+            </div>
           </div>
         )}
 
