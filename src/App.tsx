@@ -1479,7 +1479,7 @@ export default function App() {
                 🛠 Painel de Auditoria & Homologação
               </button>
             </div>
-            <AlertaWhatsAppPreventivas preventivas={preventivas} maquinas={maquinas} />
+            <AlertaWhatsAppPreventivas preventivas={preventivasCriticas} maquinas={maquinas} />
             <div style={{ marginBottom: "16px" }} />
             <DashboardExecutivo chamados={chamados}
             usuario={usuarioLogado}

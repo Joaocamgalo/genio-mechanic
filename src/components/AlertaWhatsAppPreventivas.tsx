@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import type { PreventivaMaquina, Maquina } from '../types/controlmaq';
+import type { Maquina } from '../types/controlmaq';
 
 interface AlertaWhatsAppPreventivasProps {
-  preventivas: PreventivaMaquina[];
+  preventivas: any[];
   maquinas: Maquina[];
 }
 
@@ -10,9 +10,10 @@ export function AlertaWhatsAppPreventivas({ preventivas, maquinas }: AlertaWhats
   const [telefone, setTelefone] = useState('');
   const [copiado, setCopiado] = useState(false);
 
-  const maquinasAtencao = preventivas.filter(
-    (p) => p.status === 'vencida' || p.status === 'proxima'
-  );
+  // Considera todas as preventivas críticas passadas ou filtra vencida/proxima/critica
+  const maquinasAtencao = preventivas.length > 0
+    ? preventivas
+    : [];
 
   const dataAtual = new Date().toLocaleDateString('pt-BR');
 
@@ -21,15 +22,20 @@ export function AlertaWhatsAppPreventivas({ preventivas, maquinas }: AlertaWhats
 *Total de equipamentos em atenção:* ${maquinasAtencao.length}
 
 ${maquinasAtencao.length === 0 ? '✓ Nenhuma máquina com revisão vencida no momento.' : maquinasAtencao.map((p, idx) => {
-  const maq = maquinas.find((m) => m.tag === p.maquina_tag);
-  const statusEmoji = p.status === 'vencida' ? '🔴 VENCIDA' : '🟡 PRÓXIMA';
-  const clienteNome = maq?.cliente || 'Pátio';
-  const localNome = maq?.local || 'Base';
-  return `${idx + 1}. *TAG ${p.maquina_tag}* (${maq?.modelo || 'Equipamento'})
-   - Status: ${statusEmoji}
-   - Horímetro Atual: ${p.horimetro_atual}h
-   - Revisão Alvo: ${p.proxima_revisao_horas}h
-   - Saldo: ${p.horas_restantes < 0 ? `Vencida há ${Math.abs(p.horas_restantes)}h` : `Faltam ${p.horas_restantes}h`}
+  const tagIdentificada = p.tag || p.maquina_tag || 'S/ TAG';
+  const maq = maquinas.find((m) => m.tag === tagIdentificada);
+  const statusFormatado = (p.status || 'VENCIDA').toUpperCase();
+  const horimetroAtual = p.horimetro_atual ?? p.horimetro ?? maq?.horimetro_atual ?? 0;
+  const proximaRevisao = p.proxima_revisao_horas ?? p.proxima_revisao ?? p.proximo_horimetro ?? 'Pendente';
+  const saldoHoras = p.horas_restantes ?? p.saldo_horas ?? 0;
+  const clienteNome = maq?.cliente || p.cliente || 'Pátio';
+  const localNome = maq?.local || p.local || 'Base';
+
+  return `${idx + 1}. *TAG ${tagIdentificada}* (${maq?.modelo || 'Equipamento'})
+   - Status: 🔴 ${statusFormatado}
+   - Horímetro Atual: ${horimetroAtual}h
+   - Revisão Alvo: ${proximaRevisao}h
+   - Situação: ${saldoHoras < 0 ? `Vencida há ${Math.abs(saldoHoras)}h` : `Atenção imediata (${saldoHoras}h)`}
    - Cliente / Local: ${clienteNome} (${localNome})
 `;
 }).join('\n')}
