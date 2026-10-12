@@ -150,6 +150,7 @@ export default function App() {
 
   const [filtroStatusMaquina, setFiltroStatusMaquina] = useState<'Todos' | 'Operacional' | 'Parada' | 'Em manutenção'>('Todos');
   const [buscaMaquinas, setBuscaMaquinas] = useState('');
+  const [modalDesmobilizacaoAberto, setModalDesmobilizacaoAberto] = useState(false);
   const [modalNovaMaquina, setModalNovaMaquina] = useState(false);
   const [maquinaEmEdicao, setMaquinaEmEdicao] = useState<Maquina | null>(null);
   const [maquinaDossie, setMaquinaDossie] = useState<Maquina | null>(null);
@@ -1594,6 +1595,26 @@ export default function App() {
                     >
                       + CADASTRAR MÁQUINA
                     </button>
+                    <button
+                      onClick={() => setModalDesmobilizacaoAberto(true)}
+                      style={{
+                        background: "#fef3c7",
+                        border: "1px solid #f59e0b",
+                        color: "#b45309",
+                        fontWeight: 800,
+                        fontSize: "12px",
+                        letterSpacing: "0.5px",
+                        padding: "8px 16px",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        boxShadow: "0 2px 4px rgba(15, 23, 42, 0.05)"
+                      }}
+                    >
+                      📦 DESMOBILIZAR MÁQUINA
+                    </button>
                   </>
                 )}
               </div>
@@ -1716,6 +1737,53 @@ export default function App() {
             </div>
           </div>
         )}
+
+                {/* MODAL DESMOBILIZACAO COM NOTIFICACAO */}
+        <ModalDesmobilizacao
+          aberto={modalDesmobilizacaoAberto}
+          onFechar={() => setModalDesmobilizacaoAberto(false)}
+          maquinas={maquinas}
+          onConfirmarDesmobilizacao={async ({ maquinaId, tag, horimetroFinal, condicoes, observacoes }) => {
+            try {
+              // 1. Atualizar maquina no Supabase
+              const { error } = await supabase
+                .from("maquinas")
+                .update({
+                  status_maquina: "patio",
+                  horimetro: horimetroFinal,
+                  horimetro_atual: horimetroFinal,
+                  local: "Pátio / Base Central",
+                  cliente: "Disponível para Locação",
+                  observacoes: (observacoes ? observacoes + " | " : "") + "Desmobilizada: " + condicoes
+                })
+                .eq("id", maquinaId);
+
+              if (error) {
+                console.error("Erro ao atualizar maquina no Supabase:", error);
+                throw error;
+              }
+
+              // 2. Atualizar estado local
+              setMaquinas((prev) =>
+                prev.map((m) =>
+                  m.id === maquinaId
+                    ? {
+                        ...m,
+                        status_maquina: "patio",
+                        horimetro: horimetroFinal,
+                        horimetro_atual: horimetroFinal,
+                        local: "Pátio / Base Central",
+                        cliente: "Disponível para Locação"
+                      }
+                    : m
+                )
+              );
+            } catch (err) {
+              console.error("Falha ao registrar desmobilizacao:", err);
+              throw err;
+            }
+          }}
+        />
 
         {/* MODAL MÁQUINA */}
         {modalNovaMaquina && isAdmin && (

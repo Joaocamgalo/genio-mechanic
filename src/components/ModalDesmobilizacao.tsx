@@ -1,68 +1,108 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { Maquina } from '../types/controlmaq';
 
 interface ModalDesmobilizacaoProps {
-  maquina: Maquina | null;
-  fechar: () => void;
+  aberto: boolean;
+  onFechar: () => void;
+  maquinas: Maquina[];
+  onConfirmarDesmobilizacao: (dados: {
+    maquinaId: string;
+    tag: string;
+    horimetroFinal: number;
+    emailDestino: string;
+    condicoes: string;
+    observacoes: string;
+  }) => Promise<void>;
 }
 
-export function ModalDesmobilizacao({ maquina, fechar }: ModalDesmobilizacaoProps) {
-  const [cliente, setCliente] = useState(maquina?.cliente || '');
-  const [obraLocal, setObraLocal] = useState(maquina?.local || '');
-  const [horimetroFinal, setHorimetroFinal] = useState<number>(maquina?.horimetro ?? 0);
-  const [motivo, setMotivo] = useState('Término de Contrato / Etapa da Obra');
-  const [condicoes, setCondicoes] = useState('Equipamento operacional, limpo e abastecido');
-  const [copiado, setCopiado] = useState(false);
+export function ModalDesmobilizacao({
+  aberto,
+  onFechar,
+  maquinas,
+  onConfirmarDesmobilizacao,
+}: ModalDesmobilizacaoProps) {
+  const [maquinaSelecionadaId, setMaquinaSelecionadaId] = useState('');
+  const [horimetroFinal, setHorimetroFinal] = useState<number | ''>('');
+  const [emailDestino, setEmailDestino] = useState('');
+  const [condicoes, setCondicoes] = useState('Sem avarias aparentes / Em boas condições');
+  const [observacoes, setObservacoes] = useState('');
+  const [enviando, setEnviando] = useState(false);
 
-  if (!maquina) return null;
+  if (!aberto) return null;
 
-  const assunto = `[DESMOBILIZAÇÃO] Devolução de Equipamento - TAG ${maquina.tag} (${maquina.modelo})`;
-  
-  const corpoEmail = `Prezados,
+  const maquina = maquinas.find((m) => m.id === maquinaSelecionadaId);
 
-Informamos a desmobilização e encerramento das atividades do equipamento abaixo descrito:
+  const handleSelecionarMaquina = (id: string) => {
+    setMaquinaSelecionadaId(id);
+    const m = maquinas.find((item) => item.id === id);
+    if (m) {
+      setHorimetroFinal(m.horimetro ?? m.horimetro_atual ?? 0);
+    }
+  };
 
---------------------------------------------------
-DADOS DO EQUIPAMENTO:
-- TAG: ${maquina.tag}
-- Modelo / Marca: ${maquina.marca} ${maquina.modelo}
-- Horímetro de Devolução: ${horimetroFinal} h
-- Cliente / Contratante: ${cliente || 'Não informado'}
-- Local / Frente de Obra: ${obraLocal || 'Não informado'}
-- Motivo: ${motivo}
-- Condições Físicas: ${condicoes}
---------------------------------------------------
+  const dispararEmail = (tag: string, modelo: string, horimetro: number) => {
+    const dataHora = new Date().toLocaleString('pt-BR');
+    const assunto = encodeURIComponent(`[DESMOBILIZAÇÃO] Encerramento e Devolução de Máquina - TAG ${tag}`);
+    const corpo = encodeURIComponent(`COMUNICADO OFICIAL DE DESMOBILIZAÇÃO DE EQUIPAMENTO
+Ge-Nio Mechaniq Fleet Operations
+Data/Hora: ${dataHora}
 
-Solicitamos as providências para liberação de transporte/vistoria de entrega.
+DADOS DO ATIVO:
+- TAG: ${tag}
+- Equipamento / Modelo: ${modelo}
+- Horímetro Final de Devolução: ${horimetro}h
+- Condições de Devolução: ${condicoes}
 
-Atenciosamente,
-Gestão de Frota & Manutenção — Ge-Nio Mechaniq`;
+OBSERVAÇÕES TÉCNICAS:
+${observacoes || 'Nenhuma ressalva técnica informada.'}
 
-  function copiarTexto() {
-    navigator.clipboard.writeText(`Assunto: ${assunto}\n\n${corpoEmail}`);
-    setCopiado(true);
-    setTimeout(() => setCopiado(false), 2500);
-  }
+A desmobilização foi registrada no sistema. Favor acusar o recebimento e confirmar a liberação para vistoria de pátio.`);
 
-  function dispararEmail() {
-    const link = `mailto:?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpoEmail)}`;
-    window.location.href = link;
-  }
+    const url = `mailto:${emailDestino}?subject=${assunto}&body=${corpo}`;
+    window.open(url, '_blank');
+  };
 
-  function enviarWhatsApp() {
-    const link = `https://api.whatsapp.com/send?text=${encodeURIComponent(`*${assunto}*\n\n${corpoEmail}`)}`;
-    window.open(link, '_blank');
-  }
+  const handleSalvar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!maquina) {
+      alert('Selecione uma máquina para desmobilizar.');
+      return;
+    }
+    if (horimetroFinal === '') {
+      alert('Informe o horímetro final de devolução.');
+      return;
+    }
+
+    setEnviando(true);
+    try {
+      await onConfirmarDesmobilizacao({
+        maquinaId: maquina.id,
+        tag: maquina.tag,
+        horimetroFinal: Number(horimetroFinal),
+        emailDestino,
+        condicoes,
+        observacoes,
+      });
+
+      if (emailDestino.trim()) {
+        dispararEmail(maquina.tag, `${maquina.marca || ''} ${maquina.modelo || ''}`.trim(), Number(horimetroFinal));
+      }
+
+      alert(`Máquina ${maquina.tag} desmobilizada com sucesso!`);
+      onFechar();
+    } catch (err: any) {
+      alert(`Erro ao registrar desmobilização: ${err.message || 'Falha na operação'}`);
+    } finally {
+      setEnviando(false);
+    }
+  };
 
   return (
     <div style={{
       position: 'fixed',
-      top: 0,
-      left: 0,
-      width: '100vw',
-      height: '100vh',
-      background: 'rgba(15, 23, 42, 0.75)',
-      backdropFilter: 'blur(4px)',
+      inset: 0,
+      background: 'rgba(15, 23, 42, 0.7)',
+      backdropFilter: 'blur(3px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -71,122 +111,181 @@ Gestão de Frota & Manutenção — Ge-Nio Mechaniq`;
     }}>
       <div style={{
         background: '#ffffff',
-        width: '100%',
-        maxWidth: '740px',
-        maxHeight: '92vh',
         borderRadius: '12px',
-        border: '1px solid #cbd5e1',
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
+        maxWidth: '560px',
+        width: '100%',
+        padding: '24px',
+        boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)',
+        maxHeight: '90vh',
+        overflowY: 'auto',
       }}>
-        {/* Header */}
-        <div style={{
-          background: '#0f172a',
-          color: '#ffffff',
-          padding: '16px 20px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          borderBottom: '3px solid #f97316',
-        }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div>
-            <span style={{ fontSize: '11px', color: '#fed7aa', fontWeight: 800, textTransform: 'uppercase' }}>
-              LOGÍSTICA & CONTRATOS // DESMOBILIZAÇÃO
+            <span style={{ fontSize: '11px', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase' }}>
+              GESTÃO DE DEVOLUÇÃO // FROTA
             </span>
-            <h3 style={{ margin: '4px 0 0 0', fontSize: '18px', fontWeight: 800 }}>
-              {maquina.tag} — {maquina.marca} {maquina.modelo}
+            <h3 style={{ margin: '4px 0 0', fontSize: '18px', fontWeight: 900, color: '#0f172a' }}>
+              Desmobilização & Notificação
             </h3>
           </div>
           <button
-            onClick={fechar}
-            style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '22px', cursor: 'pointer' }}
+            type="button"
+            onClick={onFechar}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              fontSize: '20px',
+              cursor: 'pointer',
+              color: '#64748b',
+            }}
           >
             ✕
           </button>
         </div>
 
-        {/* Inputs rápidos */}
-        <div style={{ padding: '16px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
+        <form onSubmit={handleSalvar} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div>
-            <label style={{ fontSize: '10px', fontWeight: 800, color: '#475569', display: 'block' }}>CLIENTE</label>
-            <input
-              value={cliente}
-              onChange={(e) => setCliente(e.target.value)}
-              style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid #94a3b8', fontSize: '12px' }}
-            />
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+              Selecionar Máquina a Desmobilizar:
+            </label>
+            <select
+              value={maquinaSelecionadaId}
+              onChange={(e) => handleSelecionarMaquina(e.target.value)}
+              required
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                border: '1px solid #cbd5e1',
+                fontSize: '13px',
+              }}
+            >
+              <option value="">Selecione um equipamento...</option>
+              {maquinas.map((m) => (
+                <option key={m.id} value={m.id}>
+                  TAG: {m.tag} — {m.marca} {m.modelo} (Atual: {m.horimetro ?? m.horimetro_atual ?? 0}h)
+                </option>
+              ))}
+            </select>
           </div>
+
           <div>
-            <label style={{ fontSize: '10px', fontWeight: 800, color: '#475569', display: 'block' }}>LOCAL / OBRA</label>
-            <input
-              value={obraLocal}
-              onChange={(e) => setObraLocal(e.target.value)}
-              style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid #94a3b8', fontSize: '12px' }}
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: '10px', fontWeight: 800, color: '#475569', display: 'block' }}>HORÍMETRO DE SAÍDA</label>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+              Horímetro Final no Encerramento (h):
+            </label>
             <input
               type="number"
+              step="0.1"
               value={horimetroFinal}
-              onChange={(e) => setHorimetroFinal(Number(e.target.value))}
-              style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid #94a3b8', fontSize: '12px', fontWeight: 800 }}
+              onChange={(e) => setHorimetroFinal(e.target.value === '' ? '' : Number(e.target.value))}
+              required
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                border: '1px solid #cbd5e1',
+                fontSize: '13px',
+              }}
             />
           </div>
-        </div>
 
-        {/* Preview do E-mail */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', background: '#0f172a' }}>
-          <div style={{ color: '#94a3b8', fontSize: '11px', marginBottom: '8px' }}>
-            ASSUNTO: <strong style={{ color: '#ffffff' }}>{assunto}</strong>
+          <div>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+              E-mail para Notificação (Cliente / Fiscal de Contrato):
+            </label>
+            <input
+              type="email"
+              placeholder="exemplo@obra.com.br, encarregado@locacao.com"
+              value={emailDestino}
+              onChange={(e) => setEmailDestino(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                border: '1px solid #cbd5e1',
+                fontSize: '13px',
+              }}
+            />
           </div>
-          <pre style={{
-            margin: 0,
-            fontFamily: 'monospace',
-            fontSize: '12px',
-            color: '#fdba74',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-            lineHeight: '1.5',
-          }}>
-            {corpoEmail}
-          </pre>
-        </div>
 
-        {/* Footer */}
-        <div style={{ padding: '14px 20px', background: '#ffffff', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-          <button
-            type="button"
-            onClick={fechar}
-            style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '8px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
-          >
-            Fechar
-          </button>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+              Checklist / Condições do Equipamento:
+            </label>
+            <select
+              value={condicoes}
+              onChange={(e) => setCondicoes(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                border: '1px solid #cbd5e1',
+                fontSize: '13px',
+              }}
+            >
+              <option value="Sem avarias aparentes / Em boas condições">Sem avarias aparentes / Em boas condições</option>
+              <option value="Necessita limpeza pesada e lavagem de pátio">Necessita limpeza pesada e lavagem de pátio</option>
+              <option value="Com avarias mecânicas / estruturais apontadas">Com avarias mecânicas / estruturais apontadas</option>
+              <option value="Parada por manutenção pendente">Parada por manutenção pendente</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+              Observações Técnicas / Peças Faltantes:
+            </label>
+            <textarea
+              rows={3}
+              placeholder="Descreva detalhes como nível de combustível, pneus/esteiras ou peças que ficaram pendentes..."
+              value={observacoes}
+              onChange={(e) => setObservacoes(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                border: '1px solid #cbd5e1',
+                fontSize: '13px',
+                resize: 'vertical',
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '12px' }}>
             <button
               type="button"
-              onClick={copiarTexto}
-              style={{ background: copiado ? '#16a34a' : '#0f172a', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: 800, cursor: 'pointer' }}
+              onClick={onFechar}
+              disabled={enviando}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '6px',
+                border: '1px solid #cbd5e1',
+                background: '#ffffff',
+                color: '#475569',
+                fontWeight: 700,
+                fontSize: '12px',
+                cursor: 'pointer',
+              }}
             >
-              {copiado ? '✓ Copiado!' : '📋 Copiar E-mail'}
+              Cancelar
             </button>
             <button
-              type="button"
-              onClick={enviarWhatsApp}
-              style={{ background: '#22c55e', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: 800, cursor: 'pointer' }}
+              type="submit"
+              disabled={enviando}
+              style={{
+                padding: '8px 18px',
+                borderRadius: '6px',
+                border: 'none',
+                background: '#f59e0b',
+                color: '#ffffff',
+                fontWeight: 800,
+                fontSize: '12px',
+                cursor: 'pointer',
+              }}
             >
-              📱 WhatsApp
-            </button>
-            <button
-              type="button"
-              onClick={dispararEmail}
-              style={{ background: '#2563eb', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: 800, cursor: 'pointer' }}
-            >
-              ✉ Abrir no E-mail
+              {enviando ? 'Processando...' : 'Confirmar & Notificar E-mail'}
             </button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );
