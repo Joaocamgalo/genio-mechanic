@@ -95,9 +95,6 @@ function compararNomes(a?: string | null, b?: string | null) {
 }
 
 export default function App() {
-  const [modalEditarChamadoAberto, setModalEditarChamadoAberto] = useState(false);
-  const [chamadoEdicao, setChamadoEdicao] = useState<any>(null);
-
   const compartilharChamadoWhatsApp = (chamado: any) => {
     const linkMaps = chamado.local
       ? "\n🗺️ *Rota Maps:* https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(chamado.local)
@@ -116,6 +113,10 @@ export default function App() {
     window.open("https://api.whatsapp.com/send?text=" + encodeURIComponent(texto), "_blank");
   };
 
+  const [modalEditarChamadoAberto, setModalEditarChamadoAberto] = useState(false);
+  const [chamadoEdicao, setChamadoEdicao] = useState<any>(null);
+
+  
   const abrirEdicaoChamado = (chamado: any) => {
     setChamadoEdicao({ ...chamado });
     setModalEditarChamadoAberto(true);
@@ -150,19 +151,7 @@ export default function App() {
     }
   };
 
-  const compartilharChamadoWhatsApp = (chamado: any) => {
-    const texto = [
-      `🛠️ *ORDEM DE SERVIÇO #${chamado.id}*`,
-      `🚜 *Máquina:* ${chamado.maquina || "N/A"}`,
-      `⚠️ *Problema:* ${chamado.problema || "N/A"}`,
-      `📍 *Local:* ${chamado.local || "Não informado"}`,
-      `👤 *Solicitante:* ${chamado.solicitante || "N/A"}`,
-      `🔧 *Mecânico:* ${chamado.mecanico || "Não designado"}`,
-      `📌 *Status:* ${chamado.status || "Pendente"}`
-    ].join("\n");
-    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`, "_blank");
-  };
-
+  
   const [isMobile, setIsMobile] = useState<boolean>(() => {
     if (typeof window !== 'undefined') return window.innerWidth <= 900;
     return false;
@@ -2779,11 +2768,9 @@ function Topo(props: {
             </div>
           )}
           <StatusConexao />
-        </div>
-      </header>
-    </>
-  
-      {/* Modal de Edicao de Chamado */}
+        
+
+{/* Modal de Edicao de Chamado */}
       {modalEditarChamadoAberto && chamadoEdicao && (
         <div 
           className="modal-editar-chamado-overlay"
@@ -2889,7 +2876,11 @@ function Topo(props: {
           </div>
         </div>
       )}
-  );
+      </div>
+      </header>
+    </>
+  
+      );
 }
 
 const estilos: Record<string, CSSProperties> = {
