@@ -95,6 +95,19 @@ function compararNomes(a?: string | null, b?: string | null) {
 }
 
 export default function App() {
+  const compartilharChamadoWhatsApp = (chamado: any) => {
+    const texto = [
+      `🛠️ *ORDEM DE SERVIÇO #${chamado.id}*`,
+      `🚜 *Máquina:* ${chamado.maquina || "N/A"}`,
+      `⚠️ *Problema:* ${chamado.problema || "N/A"}`,
+      `📍 *Local:* ${chamado.local || "Não informado"}`,
+      `👤 *Solicitante:* ${chamado.solicitante || "N/A"}`,
+      `🔧 *Mecânico:* ${chamado.mecanico || "Não designado"}`,
+      `📌 *Status:* ${chamado.status || "Pendente"}`
+    ].join("\n");
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`, "_blank");
+  };
+
   const [isMobile, setIsMobile] = useState<boolean>(() => {
     if (typeof window !== 'undefined') return window.innerWidth <= 900;
     return false;
@@ -1986,7 +1999,17 @@ export default function App() {
                         )}
 
                         <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '12px', display: 'grid', gap: '3px' }}>
-                          <div>📍 {c.local}</div>
+                          <div 
+    onClick={() => {
+      if (c.local) {
+        window.open("https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(c.local), "_blank");
+      }
+    }}
+    title="Abrir no Google Maps"
+    style={{ cursor: c.local ? "pointer" : "default", color: c.local ? "#0284c7" : "inherit", textDecoration: c.local ? "underline" : "none" }}
+  >
+    📍 {c.local || "Sem local informado"} 🗺️
+  </div>
                           <div>👤 Solicitante: {c.solicitante}</div>
                           {isAdmin && <div>🔧 Mecânico: <strong>{c.mecanico || 'Não designado'}</strong></div>}
                         </div>
@@ -2014,7 +2037,15 @@ export default function App() {
                             </button>
                           )}
 
-                          {isAdmin && (
+                          <button 
+    type="button"
+    onClick={() => compartilharChamadoWhatsApp(c)} 
+    title="Compartilhar no WhatsApp"
+    style={{ background: "#25D366", color: "#fff", border: "none", borderRadius: "6px", padding: "6px 10px", fontWeight: "bold", fontSize: "14px", cursor: "pointer" }}
+  >
+    💬
+  </button>
+  {isAdmin && (
                             <button onClick={() => excluirChamado(c)} style={estilos.botaoExcluirOS}>🗑</button>
                           )}
                         </div>
