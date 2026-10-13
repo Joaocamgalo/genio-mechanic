@@ -95,6 +95,43 @@ function compararNomes(a?: string | null, b?: string | null) {
 }
 
 export default function App() {
+  const [modalEditarChamadoAberto, setModalEditarChamadoAberto] = useState(false);
+  const [chamadoEdicao, setChamadoEdicao] = useState<any>(null);
+
+  const abrirEdicaoChamado = (chamado: any) => {
+    setChamadoEdicao({ ...chamado });
+    setModalEditarChamadoAberto(true);
+  };
+
+  const salvarEdicaoChamado = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chamadoEdicao) return;
+    try {
+      const { error } = await supabase
+        .from("chamados")
+        .update({
+          maquina: chamadoEdicao.maquina,
+          problema: chamadoEdicao.problema,
+          local: chamadoEdicao.local,
+          solicitante: chamadoEdicao.solicitante,
+          mecanico: chamadoEdicao.mecanico,
+        })
+        .eq("id", chamadoEdicao.id);
+
+      if (error) throw error;
+
+      setChamados((prev: any[]) =>
+        prev.map((item: any) => (item.id === chamadoEdicao.id ? { ...item, ...chamadoEdicao } : item))
+      );
+
+      setModalEditarChamadoAberto(false);
+      alert("Chamado atualizado com sucesso!");
+    } catch (err: any) {
+      console.error(err);
+      alert("Erro ao atualizar chamado: " + (err.message || "Tente novamente"));
+    }
+  };
+
   const compartilharChamadoWhatsApp = (chamado: any) => {
     const linkMaps = chamado.local 
       ? "\n🗺️ *Rota Google Maps:* https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(chamado.local)
@@ -2043,6 +2080,14 @@ export default function App() {
                           )}
 
                           <button 
+                            type="button" 
+                            onClick={() => abrirEdicaoChamado(c)} 
+                            title="Editar Chamado"
+                            style={{ background: "#f8fafc", color: "#334155", border: "1px solid #cbd5e1", borderRadius: "6px", padding: "6px 10px", fontWeight: "bold", fontSize: "14px", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                          >
+                            ✏️
+                          </button>
+                          <button 
       type="button" 
       onClick={() => compartilharChamadoWhatsApp(c)} 
       title="Compartilhar no WhatsApp"
@@ -2054,6 +2099,113 @@ export default function App() {
     <button onClick={() => excluirChamado(c)} style={estilos.botaoExcluirOS}>🗑</button>
   )}
                         </div>
+
+                        {/* Modal de Edicao de Chamado */}
+                        {modalEditarChamadoAberto && chamadoEdicao && chamadoEdicao.id === c.id && (
+                          <div 
+                            className="modal-editar-chamado-dialog"
+                            style={{
+                              position: "fixed",
+                              top: 0,
+                              left: 0,
+                              width: "100vw",
+                              height: "100vh",
+                              background: "rgba(15, 23, 42, 0.75)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              zIndex: 99999,
+                              padding: "16px",
+                              boxSizing: "border-box"
+                            }}
+                          >
+                            <div style={{ background: "#ffffff", borderRadius: "12px", width: "100%", maxWidth: "480px", padding: "20px", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.3)", textAlign: "left" }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                                <h3 style={{ margin: 0, fontSize: "17px", fontWeight: 700, color: "#0f172a" }}>
+                                  ✏️ Editar Chamado #{chamadoEdicao.id}
+                                </h3>
+                                <button 
+                                  type="button" 
+                                  onClick={() => setModalEditarChamadoAberto(false)}
+                                  style={{ background: "transparent", border: "none", fontSize: "18px", cursor: "pointer", color: "#64748b" }}
+                                >
+                                  ✕
+                                </button>
+                              </div>
+
+                              <form onSubmit={salvarEdicaoChamado} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                                <div>
+                                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#334155", marginBottom: "4px" }}>Máquina / TAG</label>
+                                  <input 
+                                    type="text" 
+                                    value={chamadoEdicao.maquina || ""} 
+                                    onChange={(e) => setChamadoEdicao({ ...chamadoEdicao, maquina: e.target.value })}
+                                    style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", boxSizing: "border-box" }}
+                                    required
+                                  />
+                                </div>
+
+                                <div>
+                                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#334155", marginBottom: "4px" }}>Problema / Reclamação</label>
+                                  <textarea 
+                                    rows={2}
+                                    value={chamadoEdicao.problema || ""} 
+                                    onChange={(e) => setChamadoEdicao({ ...chamadoEdicao, problema: e.target.value })}
+                                    style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", boxSizing: "border-box" }}
+                                    required
+                                  />
+                                </div>
+
+                                <div>
+                                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#334155", marginBottom: "4px" }}>Localização / Endereço</label>
+                                  <input 
+                                    type="text" 
+                                    value={chamadoEdicao.local || ""} 
+                                    onChange={(e) => setChamadoEdicao({ ...chamadoEdicao, local: e.target.value })}
+                                    style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", boxSizing: "border-box" }}
+                                    placeholder="Ex: Av. Raja Gabaglia, 1700..."
+                                  />
+                                </div>
+
+                                <div>
+                                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#334155", marginBottom: "4px" }}>Solicitante</label>
+                                  <input 
+                                    type="text" 
+                                    value={chamadoEdicao.solicitante || ""} 
+                                    onChange={(e) => setChamadoEdicao({ ...chamadoEdicao, solicitante: e.target.value })}
+                                    style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", boxSizing: "border-box" }}
+                                  />
+                                </div>
+
+                                <div>
+                                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#334155", marginBottom: "4px" }}>Mecânico Designado</label>
+                                  <input 
+                                    type="text" 
+                                    value={chamadoEdicao.mecanico || ""} 
+                                    onChange={(e) => setChamadoEdicao({ ...chamadoEdicao, mecanico: e.target.value })}
+                                    style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", boxSizing: "border-box" }}
+                                  />
+                                </div>
+
+                                <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "12px" }}>
+                                  <button 
+                                    type="button" 
+                                    onClick={() => setModalEditarChamadoAberto(false)}
+                                    style={{ padding: "8px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", background: "#f1f5f9", cursor: "pointer", fontWeight: 600 }}
+                                  >
+                                    Cancelar
+                                  </button>
+                                  <button 
+                                    type="submit"
+                                    style={{ padding: "8px 14px", borderRadius: "6px", border: "none", background: "#0284c7", color: "#fff", cursor: "pointer", fontWeight: 700 }}
+                                  >
+                                    Salvar Alterações
+                                  </button>
+                                </div>
+                              </form>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })
