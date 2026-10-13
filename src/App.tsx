@@ -1738,52 +1738,7 @@ export default function App() {
           </div>
         )}
 
-                {/* MODAL DESMOBILIZACAO COM NOTIFICACAO */}
-        <ModalDesmobilizacao
-          aberto={modalDesmobilizacaoAberto}
-          onFechar={() => setModalDesmobilizacaoAberto(false)}
-          maquinas={maquinas}
-          onConfirmarDesmobilizacao={async ({ maquinaId, tag, horimetroFinal, condicoes, observacoes }) => {
-            try {
-              // 1. Atualizar maquina no Supabase
-              const { error } = await supabase
-                .from("maquinas")
-                .update({
-                  status_maquina: "patio",
-                  horimetro: horimetroFinal,
-                  horimetro_atual: horimetroFinal,
-                  local: "Pátio / Base Central",
-                  cliente: "Disponível para Locação",
-                  observacoes: (observacoes ? observacoes + " | " : "") + "Desmobilizada: " + condicoes
-                })
-                .eq("id", maquinaId);
-
-              if (error) {
-                console.error("Erro ao atualizar maquina no Supabase:", error);
-                throw error;
-              }
-
-              // 2. Atualizar estado local
-              setMaquinas((prev) =>
-                prev.map((m) =>
-                  m.id === maquinaId
-                    ? {
-                        ...m,
-                        status_maquina: "patio",
-                        horimetro: horimetroFinal,
-                        horimetro_atual: horimetroFinal,
-                        local: "Pátio / Base Central",
-                        cliente: "Disponível para Locação"
-                      }
-                    : m
-                )
-              );
-            } catch (err) {
-              console.error("Falha ao registrar desmobilizacao:", err);
-              throw err;
-            }
-          }}
-        />
+                
 
         {/* MODAL MÁQUINA */}
         {modalNovaMaquina && isAdmin && (
@@ -1827,10 +1782,74 @@ export default function App() {
             fechar={() => setModalAuditoriaAberto(false)}
           />
         )}
-        {maquinaDesmobilizar && (
+        {(modalDesmobilizacaoAberto || maquinaDesmobilizar) && (
           <ModalDesmobilizacao
-            maquina={maquinaDesmobilizar}
-            fechar={() => setMaquinaDesmobilizar(null)}
+            aberto={Boolean(modalDesmobilizacaoAberto || maquinaDesmobilizar)}
+            maquinaPreSelecionada={maquinaDesmobilizar || undefined}
+            maquinas={maquinas}
+            onFechar={() => {
+              setModalDesmobilizacaoAberto(false);
+              setMaquinaDesmobilizar(null);
+            }}
+            onConfirmarDesmobilizacao={async ({ maquinaId, tag, horimetroFinal, emailDestino, condicoes, observacoes }) => {
+              try {
+                // 1. Atualizar maquina no Supabase
+                const { error: errMaq } = await supabase
+                  .from("maquinas")
+                  .update({
+                    horimetro: horimetroFinal,
+                    status_maquina: "Parada"
+                  })
+                  .eq("id", maquinaId);
+
+                if (errMaq) {
+                  console.error("Erro no Supabase:", errMaq);
+                  throw errMaq;
+                }
+
+                // 2. Atualizar estado local da aplicacao
+                setMaquinas((prev) =>
+                  prev.map((m) =>
+                    m.id === maquinaId
+                      ? {
+                          ...m,
+                          horimetro: horimetroFinal,
+                          status_maquina: "Parada"
+                        }
+                      : m
+                  )
+                );
+
+                // 3. Disparar notificacao por e-mail para o Resend
+                const targetEmail = emailDestino || "jpsf016@gmail.com";
+                try {
+                  const resposta = await fetch("/api/desmobilizar", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      tag,
+                      horimetroFinal,
+                      condicoes,
+                      observacoes,
+                      emailDestino: targetEmail
+                    })
+                  });
+                  if (!resposta.ok) {
+                    const errData = await resposta.json().catch(() => ({}));
+                    console.warn("Aviso no envio de e-mail:", errData);
+                  }
+                } catch (eMail) {
+                  console.warn("Falha de rede ao acionar API de e-mail:", eMail);
+                }
+
+                alert("Desmobilização concluída com sucesso!");
+                setModalDesmobilizacaoAberto(false);
+                setMaquinaDesmobilizar(null);
+              } catch (err) {
+                console.error("Falha ao salvar desmobilizacao:", err);
+                throw err;
+              }
+            }}
           />
         )}
         {maquinaRequisicao && (
