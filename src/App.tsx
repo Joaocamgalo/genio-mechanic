@@ -1746,15 +1746,87 @@ export default function App() {
                       {maquina.marca} • {maquina.modelo}
                     </div>
 
-                    <div style={estilos.caixaHorimetro}>
-                      <div>
-                        <small style={{ color: '#64748b', fontSize: '10px' }}>Horímetro</small>
-                        <div style={{ fontSize: '18px', fontWeight: 900 }}>{maquina.horimetro ?? 0} h</div>
-                      </div>
-                      <button onClick={() => alterarHorimetroManual(maquina)} style={estilos.botaoAjustarHorimetro}>
-                        Ajustar
-                      </button>
-                    </div>
+                    
+                    {/* Bloco Preditivo de Horímetro & Preventiva Inteligente */}
+                    {(() => {
+                      const hAtual = Number(maquina.horimetro ?? 0);
+                      const ciclo = 250;
+                      const proximaRevisao = Math.ceil((hAtual + 1) / ciclo) * ciclo;
+                      const horasRestantes = proximaRevisao - hAtual;
+                      const progressoCiclo = Math.min(100, Math.max(0, Math.round(((ciclo - horasRestantes) / ciclo) * 100)));
+                      
+                      // Estimativa de dias (media padrao de 6h/dia)
+                      const diasEstimados = Math.max(0, Math.round(horasRestantes / 6));
+                      const dataEstimada = new Date();
+                      dataEstimada.setDate(dataEstimada.getDate() + diasEstimados);
+                      const dataFormatada = dataEstimada.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+
+                      const isCritico = horasRestantes <= 10;
+                      const isAtencao = horasRestantes <= 35 && !isCritico;
+
+                      return (
+                        <div style={{
+                          background: isCritico ? "#fff1f2" : isAtencao ? "#fffbeb" : "#f8fafc",
+                          border: isCritico ? "1px solid #fecdd3" : isAtencao ? "1px solid #fde68a" : "1px solid #e2e8f0",
+                          borderRadius: "10px",
+                          padding: "10px 12px",
+                          marginBottom: "12px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "8px"
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <div>
+                              <div style={{ fontSize: "10px", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Horímetro Atual</div>
+                              <div style={{ fontSize: "18px", fontWeight: 900, color: "#0f172a", letterSpacing: "-0.5px" }}>
+                                {hAtual} <span style={{ fontSize: "12px", fontWeight: 600, color: "#64748b" }}>h</span>
+                              </div>
+                            </div>
+                            <button onClick={() => alterarHorimetroManual(maquina)} style={{ ...estilos.botaoAjustarHorimetro, borderRadius: "6px" }}>
+                              Ajustar
+                            </button>
+                          </div>
+
+                          {/* Barra de Progresso do Ciclo Preventivo */}
+                          <div>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "4px" }}>
+                              <span style={{ color: "#64748b", fontWeight: 600 }}>Próxima ({proximaRevisao}h):</span>
+                              <strong style={{ color: isCritico ? "#e11d48" : isAtencao ? "#d97706" : "#0284c7" }}>
+                                {horasRestantes === 0 ? "VENCIDA HOJE" : `${horasRestantes}h restantes`}
+                              </strong>
+                            </div>
+                            <div style={{ width: "100%", height: "6px", background: "#e2e8f0", borderRadius: "99px", overflow: "hidden" }}>
+                              <div style={{
+                                width: `${progressoCiclo}%`,
+                                height: "100%",
+                                background: isCritico ? "#e11d48" : isAtencao ? "#f59e0b" : "#0284c7",
+                                borderRadius: "99px",
+                                transition: "width 0.3s ease"
+                              }} />
+                            </div>
+                          </div>
+
+                          {/* Previsão Preditiva em Dias */}
+                          <div style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            fontSize: "10.5px",
+                            paddingTop: "4px",
+                            borderTop: "1px dashed rgba(0,0,0,0.06)"
+                          }}>
+                            <span style={{ color: "#64748b" }}>Previsão de intervenção:</span>
+                            <span style={{
+                              fontWeight: 700,
+                              color: isCritico ? "#be123c" : isAtencao ? "#b45309" : "#334155"
+                            }}>
+                              {horasRestantes === 0 ? "🚨 Manutenção Urgente" : `~ ${diasEstimados} dias (${dataFormatada})`}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
 
                     <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? '1.2fr 1fr' : '1fr', gap: '6px', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
                       {isAdmin && (
