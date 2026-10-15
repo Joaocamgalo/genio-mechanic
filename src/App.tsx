@@ -1401,8 +1401,7 @@ export default function App() {
         </div>
       )}
 
-      <Topo
-        usuario={usuarioLogado}
+      <Topo onAbrirBusca={() => setModalBuscaGlobalAberto(true)} usuario={usuarioLogado}
         tela={tela}
         isMobile={isMobile}
         onNavigate={(t) => {
@@ -2935,7 +2934,8 @@ function Topo(props: {
   isMobile: boolean;
   onNavigate: (tela: Tela) => void;
   onSair: () => void;
-}) {
+
+  onAbrirBusca?: () => void; }) {
   const [menuAberto, setMenuAberto] = useState(false);
   const isAdmin = props.usuario?.tipo === "admin";
   const isMecanico = props.usuario?.tipo === "mecanico";
@@ -3098,6 +3098,38 @@ function Topo(props: {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+
+            {props.onAbrirBusca && !props.isMobile && (
+              <button
+                type="button"
+                onClick={props.onAbrirBusca}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  background: "#1e293b",
+                  border: "1px solid #334155",
+                  padding: "6px 12px",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  color: "#94a3b8",
+                  cursor: "pointer"
+                }}
+              >
+                <Search size={14} color="#94a3b8" />
+                <span>Pesquisa rápida...</span>
+                <kbd style={{
+                  background: "#0f172a",
+                  border: "1px solid #334155",
+                  borderRadius: "4px",
+                  padding: "1px 5px",
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  color: "#cbd5e1"
+                }}>Ctrl K</kbd>
+              </button>
+            )}
+  
 
             <button
               type="button"
