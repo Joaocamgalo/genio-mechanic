@@ -1,4 +1,4 @@
-import { MapPin, User, Wrench, Share2, Pencil, Trash2, CheckCircle2, Eye, FileText, AlertTriangle } from "lucide-react";
+import { MapPin, User, Wrench, Share2, Pencil, Trash2, CheckCircle2, Eye, FileText, AlertTriangle } , LayoutDashboard } , ClipboardList } , Truck } , CalendarClock } , Gauge } , Users } , LogOut } from 'lucide-react';
 import {
   useEffect,
   useRef,
@@ -2900,16 +2900,16 @@ function Topo(props: {
   onSair: () => void;
 }) {
   const [menuAberto, setMenuAberto] = useState(false);
-  const isAdmin = props.usuario?.tipo === 'admin';
-  const isMecanico = props.usuario?.tipo === 'mecanico';
+  const isAdmin = props.usuario?.tipo === "admin";
+  const isMecanico = props.usuario?.tipo === "mecanico";
 
   const itens = [
-    ...(isAdmin ? [{ tela: 'dashboard' as const, label: 'Painel Executivo' }] : []),
-    { tela: 'chamados' as const, label: isMecanico ? 'Minhas O.S.' : 'Ordens de Serviço' },
-    { tela: 'maquinas' as const, label: 'Frota de Máquinas' },
-    { tela: 'preventivas' as const, label: 'Plano Preventivo' },
-    ...(isAdmin ? [{ tela: 'horimetros' as const, label: 'Horímetros' }] : []),
-    ...(isAdmin ? [{ tela: 'usuarios' as const, label: 'Utilizadores' }] : []),
+    ...(isAdmin ? [{ tela: "dashboard" as const, label: "Painel Executivo", icon: LayoutDashboard }] : []),
+    { tela: "chamados" as const, label: isMecanico ? "Minhas O.S." : "Ordens de Serviço", icon: ClipboardList },
+    { tela: "maquinas" as const, label: "Frota de Máquinas", icon: Truck },
+    { tela: "preventivas" as const, label: "Plano Preventivo", icon: CalendarClock },
+    ...(isAdmin ? [{ tela: "horimetros" as const, label: "Horímetros", icon: Gauge }] : []),
+    ...(isAdmin ? [{ tela: "usuarios" as const, label: "Utilizadores", icon: Users }] : []),
   ];
 
   return (
@@ -2918,65 +2918,132 @@ function Topo(props: {
         <div
           onClick={() => setMenuAberto(false)}
           style={{
-            position: 'fixed',
+            position: "fixed",
             inset: 0,
-            background: 'rgba(15, 23, 42, 0.65)',
+            background: "rgba(15, 23, 42, 0.65)",
             zIndex: 49,
-            backdropFilter: 'blur(2px)',
+            backdropFilter: "blur(2px)",
           }}
         />
       )}
 
-      <aside className={`controlmaq-desktop-sidebar ${menuAberto ? 'controlmaq-sidebar-open' : ''}`} style={estilos.sidebar}>
-        <div style={{ padding: '16px', borderBottom: '1px solid #1e293b', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <img src="/icon-192.png" alt="Ge-Nio" style={{ width: "36px", height: "36px", borderRadius: "8px", objectFit: "contain", boxShadow: "0 2px 4px rgba(0,0,0,0.3)" }} />
+      <aside 
+        className={`controlmaq-desktop-sidebar ${menuAberto ? "controlmaq-sidebar-open" : ""}`} 
+        style={{
+          ...estilos.sidebar,
+          background: "#0f172a",
+          borderRight: "1px solid #1e293b",
+          display: "flex",
+          flexDirection: "column",
+          boxShadow: "2px 0 8px rgba(0,0,0,0.15)"
+        }}
+      >
+        {/* Header ti Sidebar */}
+        <div style={{ padding: "20px 16px", borderBottom: "1px solid #1e293b", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <img src="/icon-192.png" alt="Ge-Nio" style={{ width: "32px", height: "32px", borderRadius: "8px", objectFit: "contain" }} />
             <div style={{ display: "flex", flexDirection: "column" }}>
-              <span style={{ fontSize: "17px", fontWeight: 900, color: "#f59e0b", lineHeight: "1.1" }}>Ge-Nio</span>
-              <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "1.5px", color: "#94a3b8" }}>MECHANIQ</span>
+              <span style={{ fontSize: "15px", fontWeight: 800, color: "#f8fafc", letterSpacing: "-0.02em" }}>Ge-Nio</span>
+              <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "1.2px", color: "#64748b" }}>MECHANIQ</span>
             </div>
           </div>
           {props.isMobile && (
             <button
               onClick={() => setMenuAberto(false)}
               style={{
-                background: 'rgba(255,255,255,0.1)',
-                border: 0,
-                color: '#fff',
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                fontSize: '16px',
-                cursor: 'pointer',
-                display: 'grid',
-                placeItems: 'center',
-                fontWeight: 800,
+                background: "transparent",
+                border: "none",
+                color: "#94a3b8",
+                cursor: "pointer",
+                padding: "4px"
               }}
             >
-              ✕
+              <X size={18} />
             </button>
           )}
         </div>
-        <nav style={{ padding: '10px', display: 'grid', gap: '4px' }}>
-          {itens.map((item) => (
-            <button
-              key={item.tela}
-              onClick={() => { props.onNavigate(item.tela); setMenuAberto(false); }}
-              style={{
-                ...estilos.sidebarItem,
-                background: props.tela === item.tela ? '#1e293b' : 'transparent',
-                color: props.tela === item.tela ? '#fff' : '#94a3b8',
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
+
+        {/* Listaan ti Menus */}
+        <nav style={{ padding: "12px 8px", display: "flex", flexDirection: "column", gap: "4px", flex: 1 }}>
+          {itens.map((item) => {
+            const Icon = item.icon;
+            const activo = props.tela === item.tela;
+            return (
+              <button
+                key={item.tela}
+                onClick={() => { props.onNavigate(item.tela); setMenuAberto(false); }}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  padding: "10px 12px",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  fontWeight: activo ? 600 : 500,
+                  color: activo ? "#ffffff" : "#94a3b8",
+                  background: activo ? "#1e293b" : "transparent",
+                  border: activo ? "1px solid #334155" : "1px solid transparent",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  transition: "all 0.15s ease"
+                }}
+              >
+                <Icon size={16} color={activo ? "#38bdf8" : "#64748b"} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
         </nav>
-        <div style={{ marginTop: 'auto', padding: '16px', borderTop: '1px solid #1e293b' }}>
-          <div style={{ marginBottom: '8px', fontSize: '11px', color: '#64748b' }}>
-            Perfil: <strong style={{ color: '#fff', textTransform: 'capitalize' }}>{props.usuario?.tipo}</strong>
+
+        {/* Footer ken User Profile */}
+        <div style={{ padding: "16px", borderTop: "1px solid #1e293b", background: "#0b1120" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+            <div style={{
+              width: "32px",
+              height: "32px",
+              borderRadius: "50%",
+              background: "#1e293b",
+              border: "1px solid #334155",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "12px",
+              fontWeight: 700,
+              color: "#38bdf8"
+            }}>
+              {(props.usuario?.nome || props.usuario?.tipo || "U").substring(0, 1).toUpperCase()}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              <span style={{ fontSize: "12px", fontWeight: 600, color: "#f1f5f9", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {props.usuario?.nome || "Utilizador"}
+              </span>
+              <span style={{ fontSize: "10px", color: "#64748b", textTransform: "capitalize" }}>
+                {props.usuario?.tipo || "Operador"}
+              </span>
+            </div>
           </div>
-          <button onClick={props.onSair} style={estilos.sidebarSair}>Terminar Sessão</button>
+
+          <button 
+            onClick={props.onSair} 
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              padding: "8px 12px",
+              borderRadius: "6px",
+              background: "#1e293b",
+              border: "1px solid #334155",
+              color: "#f87171",
+              fontSize: "12px",
+              fontWeight: 600,
+              cursor: "pointer"
+            }}
+          >
+            <LogOut size={14} /> Terminar Sessão
+          </button>
         </div>
       </aside>
 
