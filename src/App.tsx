@@ -1752,7 +1752,7 @@ export default function App() {
                       const hAtual = Number(maquina.horimetro ?? 0);
                       const ciclo = 250;
                       const proximaRevisao = Math.ceil((hAtual + 1) / ciclo) * ciclo;
-                      const horasRestantes = proximaRevisao - hAtual;
+                      const horasRestantes = Math.max(0, proximaRevisao - hAtual);
                       const progressoCiclo = Math.min(100, Math.max(0, Math.round(((ciclo - horasRestantes) / ciclo) * 100)));
                       
                       // Estimativa preditiva baseada em turno padrão de 8h/dia
@@ -1761,16 +1761,15 @@ export default function App() {
                       dataEstimada.setDate(dataEstimada.getDate() + diasEstimados);
                       const dataFormatada = dataEstimada.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 
-                      // Regras de Alerta e Lead Time:
-                      // - Crítico: <= 10 horas (ou 1 dia)
-                      // - Alerta Pedido Filtros / Importação: <= 45 dias (ou <= 360 horas)
+                      // Regras claras e todas as variáveis declaradas:
                       const isCritico = horasRestantes <= 10;
+                      const isAtencao = horasRestantes <= 35 && !isCritico;
                       const isAlertaFiltros = diasEstimados <= 45 && !isCritico;
 
                       return (
                         <div style={{
-                          background: isCritico ? "#fff1f2" : isAlertaFiltros ? "#fefce8" : "#f8fafc",
-                          border: isCritico ? "1px solid #fecdd3" : isAlertaFiltros ? "1px solid #fde047" : "1px solid #e2e8f0",
+                          background: isCritico ? "#fff1f2" : isAtencao ? "#fffbeb" : isAlertaFiltros ? "#fefce8" : "#f8fafc",
+                          border: isCritico ? "1px solid #fecdd3" : isAtencao ? "1px solid #fde68a" : isAlertaFiltros ? "1px solid #fde047" : "1px solid #e2e8f0",
                           borderRadius: "10px",
                           padding: "10px 12px",
                           marginBottom: "12px",
@@ -1811,15 +1810,15 @@ export default function App() {
                           <div>
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "4px" }}>
                               <span style={{ color: "#64748b", fontWeight: 600 }}>Próxima ({proximaRevisao}h):</span>
-                              <strong style={{ color: isCritico ? "#e11d48" : isAtencao ? "#d97706" : "#0284c7" }}>
-                                {horasRestantes === 0 ? "VENCIDA HOJE" : `${horasRestantes}h restantes`}
+                              <strong style={{ color: isCritico ? "#e11d48" : isAtencao ? "#d97706" : isAlertaFiltros ? "#ca8a04" : "#0284c7" }}>
+                                {horasRestantes === 0 ? "VENCIDA HOJE" : horasRestantes + "h restantes"}
                               </strong>
                             </div>
                             <div style={{ width: "100%", height: "6px", background: "#e2e8f0", borderRadius: "99px", overflow: "hidden" }}>
                               <div style={{
-                                width: `${progressoCiclo}%`,
+                                width: progressoCiclo + "%",
                                 height: "100%",
-                                background: isCritico ? "#e11d48" : isAtencao ? "#f59e0b" : "#0284c7",
+                                background: isCritico ? "#e11d48" : isAtencao ? "#f59e0b" : isAlertaFiltros ? "#eab308" : "#0284c7",
                                 borderRadius: "99px",
                                 transition: "width 0.3s ease"
                               }} />
@@ -1838,13 +1837,13 @@ export default function App() {
                             <span style={{ color: "#64748b" }}>Previsão (~8h/dia):</span>
                             <span style={{
                               fontWeight: 700,
-                              color: isCritico ? "#be123c" : isAtencao ? "#b45309" : "#334155"
+                              color: isCritico ? "#be123c" : isAtencao ? "#b45309" : isAlertaFiltros ? "#854d0e" : "#334155"
                             }}>
                               {horasRestantes === 0 
-        ? "🚨 Revisão Vencida" 
-        : isAlertaFiltros 
-        ? `⚠️ ~ ${diasEstimados} dias (${dataFormatada}) · Providenciar Peças` 
-        : `~ ${diasEstimados} dias (${dataFormatada})`}
+                                ? "🚨 Revisão Vencida" 
+                                : isAlertaFiltros 
+                                ? "~ " + diasEstimados + " dias (" + dataFormatada + ") · Pedir Filtros" 
+                                : "~ " + diasEstimados + " dias (" + dataFormatada + ")"}
                             </span>
                           </div>
                         </div>
