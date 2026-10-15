@@ -241,17 +241,44 @@ export default function App() {
   const [filtroMaquinaChamados, setFiltroMaquinaChamados] = useState('');
   const [filtroMecanicoChamados, setFiltroMecanicoChamados] = useState('');
 
-  const [filtroStatusMaquina, setFiltroStatusMaquina] = useState<'Todos' | 'Operacional' | 'Parada' | 'Em manutenção'>('Todos');
+  const [filtroStatusMaquina, setFiltroStatusMaquina] = useState<'Todos' | 'Operacional' | 'Parada' | 'Em manutenção' | 'Pedir Filtros (45d)'>('Todos');
   const [buscaMaquinas, setBuscaMaquinas] = useState('');
   const [modalDesmobilizacaoAberto, setModalDesmobilizacaoAberto] = useState(false);
   const [modalNovaMaquina, setModalNovaMaquina] = useState(false);
   const [maquinaEmEdicao, setMaquinaEmEdicao] = useState<Maquina | null>(null);
   const [maquinaDossie, setMaquinaDossie] = useState<Maquina | null>(null);
+  const [leiturasDossie, setLeiturasDossie] = useState<any[]>([]);
+  const [carregandoLeituras, setCarregandoLeituras] = useState(false);
   const [maquinaFichaTecnica, setMaquinaFichaTecnica] = useState<Maquina | null>(null);
   const [maquinaRequisicao, setMaquinaRequisicao] = useState<Maquina | null>(null);
   const [maquinaDesmobilizar, setMaquinaDesmobilizar] = useState<Maquina | null>(null);
   const [modalAuditoriaAberto, setModalAuditoriaAberto] = useState(false);
   const [chamadoConcluirAssistido, setChamadoConcluirAssistido] = useState<Chamado | null>(null);
+  
+  useEffect(() => {
+    if (!maquinaDossie) {
+      setLeiturasDossie([]);
+      return;
+    }
+    async function buscarLeituras() {
+      setCarregandoLeituras(true);
+      try {
+        const { data } = await supabase
+          .from("leituras_horimetro")
+          .select("*")
+          .eq("maquina_id", maquinaDossie?.id)
+          .order("created_at", { ascending: false })
+          .limit(10);
+        setLeiturasDossie(data || []);
+      } catch (err) {
+        console.error("Erro ao carregar leituras do dossie:", err);
+      } finally {
+        setCarregandoLeituras(false);
+      }
+    }
+    buscarLeituras();
+  }, [maquinaDossie]);
+
   const [modoVisualizacaoOS, setModoVisualizacaoOS] = useState<'kanban' | 'lista'>('kanban');
 
   const [leiturasLote, setLeiturasLote] = useState<Record<string, string>>({});
@@ -391,6 +418,15 @@ export default function App() {
 
     if (!bateTexto) return false;
     if (filtroStatusMaquina === 'Todos') return true;
+
+    if (filtroStatusMaquina === 'Pedir Filtros (45d)') {
+      const hAtual = Number(m.horimetro ?? 0);
+      const ciclo = 250;
+      const proximaRevisao = Math.ceil((hAtual + 1) / ciclo) * ciclo;
+      const horasRestantes = Math.max(0, proximaRevisao - hAtual);
+      const diasEstimados = Math.round(horasRestantes / 8);
+      return diasEstimados <= 45;
+    }
 
     const situacaoCalculada = calcularSituacaoMaquina(m.tag, chamados);
     if (filtroStatusMaquina === 'Em manutenção') return situacaoCalculada === 'Em manutenção';
@@ -1718,13 +1754,13 @@ export default function App() {
             />
 
             <div style={estilos.filtros}>
-              {(['Todos', 'Operacional', 'Parada', 'Em manutenção'] as const).map((st) => (
+              {(['Todos', 'Pedir Filtros (45d)', 'Operacional', 'Parada', 'Em manutenção'] as const).map((st) => (
                 <button
                   key={st}
                   onClick={() => setFiltroStatusMaquina(st)}
                   style={{
                     ...estilos.botaoFiltro,
-                    background: filtroStatusMaquina === st ? '#0f172a' : '#fff',
+                    background: filtroStatusMaquina === st ? (st === 'Pedir Filtros (45d)' ? '#ca8a04' : '#0f172a') : '#fff',
                     color: filtroStatusMaquina === st ? '#fff' : '#475569',
                   }}
                 >
@@ -2052,16 +2088,132 @@ export default function App() {
         )}
         {maquinaDossie && (
           <div style={estilos.modalOverlay}>
-            <div style={{ ...estilos.modalCard, width: isMobile ? '95vw' : '100%', maxWidth: '650px', maxHeight: '85vh', overflowY: 'auto', padding: isMobile ? '16px' : '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <h3 style={{ margin: 0 }}>Dossiê: {maquinaDossie.tag}</h3>
+            <div style={{ ...estilos.modalCard, width: isMobile ? "95vw" : "100%", maxWidth: "750px", maxHeight: "88vh", overflowY: "auto", padding: isMobile ? "16px" : "24px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "2px solid #e2e8f0", paddingBottom: "12px" }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ background: "#0f172a", color: "#fff", fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "4px" }}>
+                      {maquinaDossie.tag}
+                    </span>
+                    <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>Prontuário & Histórico</span>
+                  </div>
+                  <h3 style={{ margin: "4px 0 0 0", fontSize: "18px", color: "#0f172a" }}>
+                    {maquinaDossie.marca} {maquinaDossie.modelo}
+                  </h3>
+                </div>
                 <button onClick={() => setMaquinaDossie(null)} style={estilos.botaoFecharModal}>✕</button>
               </div>
-              <button onClick={() => gerarPdfDossie(maquinaDossie)} style={{ ...estilos.botaoNovoSubmit, marginBottom: '12px' }}>
-                📄 Emitir Prontuário em PDF
-              </button>
-              <div style={{ fontSize: '13px' }}>
-                <strong>Total de Chamados:</strong> {chamados.filter((c) => normalizarTexto(c.maquina) === normalizarTexto(maquinaDossie.tag)).length}
+
+              {/* Botões de Ação */}
+              <div style={{ display: "flex", gap: "10px", marginBottom: "16px", flexWrap: "wrap" }}>
+                <button onClick={() => gerarPdfDossie(maquinaDossie)} style={{ ...estilos.botaoNovoSubmit, flex: 1, minWidth: "180px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                  📄 Emitir Prontuário em PDF
+                </button>
+                <button onClick={() => { setMaquinaRequisicao(maquinaDossie); setMaquinaDossie(null); }} style={{ ...estilos.botaoNovoSubmit, background: "#ca8a04", flex: 1, minWidth: "180px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                  📦 Abrir Requisição de Peças
+                </button>
+              </div>
+
+              {/* Resumo Operacional */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "10px", marginBottom: "16px" }}>
+                <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "10px" }}>
+                  <div style={{ fontSize: "11px", color: "#64748b", fontWeight: 700 }}>HORÍMETRO ATUAL</div>
+                  <div style={{ fontSize: "18px", fontWeight: 800, color: "#0f172a" }}>{maquinaDossie.horimetro ?? 0} h</div>
+                </div>
+                <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "10px" }}>
+                  <div style={{ fontSize: "11px", color: "#64748b", fontWeight: 700 }}>TURNO ESTIMADO</div>
+                  <div style={{ fontSize: "18px", fontWeight: 800, color: "#0284c7" }}>8 h/dia</div>
+                </div>
+                <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "10px" }}>
+                  <div style={{ fontSize: "11px", color: "#64748b", fontWeight: 700 }}>TOTAL ORDENS / OS</div>
+                  <div style={{ fontSize: "18px", fontWeight: 800, color: "#d97706" }}>
+                    {chamados.filter((c) => normalizarTexto(c.maquina) === normalizarTexto(maquinaDossie.tag)).length}
+                  </div>
+                </div>
+              </div>
+
+              {/* Tabela de Histórico de Horímetros (leituras_horimetro) */}
+              <div style={{ marginBottom: "20px" }}>
+                <h4 style={{ margin: "0 0 8px 0", fontSize: "13px", color: "#334155", fontWeight: 800, textTransform: "uppercase" }}>
+                  ⏱️ Últimos Apontamentos de Horímetro
+                </h4>
+                {carregandoLeituras ? (
+                  <p style={{ fontSize: "12px", color: "#64748b" }}>Buscando leituras...</p>
+                ) : leiturasDossie.length === 0 ? (
+                  <div style={{ background: "#f8fafc", border: "1px dashed #cbd5e1", borderRadius: "6px", padding: "12px", textAlign: "center", fontSize: "12px", color: "#64748b" }}>
+                    Nenhum apontamento registrado ainda no histórico. Novos ajustes manuais e medições em campo aparecerão aqui.
+                  </div>
+                ) : (
+                  <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: "8px" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left" }}>
+                      <thead>
+                        <tr style={{ background: "#f1f5f9", borderBottom: "1px solid #cbd5e1" }}>
+                          <th style={{ padding: "8px 10px", fontWeight: 800, color: "#475569" }}>DATA/HORA</th>
+                          <th style={{ padding: "8px 10px", fontWeight: 800, color: "#475569" }}>HORÍMETRO</th>
+                          <th style={{ padding: "8px 10px", fontWeight: 800, color: "#475569" }}>APONTADOR / USUÁRIO</th>
+                          <th style={{ padding: "8px 10px", fontWeight: 800, color: "#475569" }}>ORIGEM</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {leiturasDossie.map((lei) => (
+                          <tr key={lei.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                            <td style={{ padding: "8px 10px", color: "#334155" }}>
+                              {new Date(lei.created_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                            </td>
+                            <td style={{ padding: "8px 10px", fontWeight: 800, color: "#0f172a" }}>
+                              {lei.horimetro} h
+                            </td>
+                            <td style={{ padding: "8px 10px", color: "#475569" }}>
+                              {lei.operador_nome || "Sistema / Ajuste"}
+                            </td>
+                            <td style={{ padding: "8px 10px", color: "#64748b", textTransform: "capitalize" }}>
+                              {lei.origem ? lei.origem.replace("_", " ") : "Manual"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Lista Rápida de Chamados / O.S. Recentes */}
+              <div>
+                <h4 style={{ margin: "0 0 8px 0", fontSize: "13px", color: "#334155", fontWeight: 800, textTransform: "uppercase" }}>
+                  🛠️ Histórico de Chamados & Manutenções
+                </h4>
+                {(() => {
+                  const chams = chamados.filter((c) => normalizarTexto(c.maquina) === normalizarTexto(maquinaDossie.tag));
+                  if (chams.length === 0) {
+                    return (
+                      <div style={{ background: "#f8fafc", border: "1px dashed #cbd5e1", borderRadius: "6px", padding: "12px", textAlign: "center", fontSize: "12px", color: "#64748b" }}>
+                        Nenhuma ordem de serviço ou chamado registrado para esta máquina.
+                      </div>
+                    );
+                  }
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      {chams.slice(0, 5).map((c) => (
+                        <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "6px", padding: "8px 12px", fontSize: "12px" }}>
+                          <div>
+                            <span style={{ fontWeight: 800, color: "#0f172a", marginRight: "6px" }}>OS #{c.id}</span>
+                            <span style={{ color: "#475569" }}>{c.titulo || c.descricao?.substring(0, 45) || "Manutenção"}</span>
+                          </div>
+                          <span style={{
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            fontSize: "10px",
+                            fontWeight: 800,
+                            background: c.status === "Concluído" ? "#dcfce7" : "#fee2e2",
+                            color: c.status === "Concluído" ? "#15803d" : "#b91c1c"
+                          }}>
+                            {c.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>

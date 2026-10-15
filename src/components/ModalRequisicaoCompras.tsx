@@ -10,8 +10,9 @@ interface ModalRequisicaoComprasProps {
 export function ModalRequisicaoCompras({ maquina, fechar }: ModalRequisicaoComprasProps) {
   const [itens, setItens] = useState<ItemManutencaoPreventiva[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const [cicloSelecionado, setCicloSelecionado] = useState<number>(500);
-  const [leadTimeDias, setLeadTimeDias] = useState<number>(20);
+  const proximoCicloPadrao = Math.ceil(((maquina?.horimetro ?? 0) + 1) / 250) * 250;
+  const [cicloSelecionado, setCicloSelecionado] = useState<number>(proximoCicloPadrao);
+  const [leadTimeDias, setLeadTimeDias] = useState<number>(45);
   const [copiado, setCopiado] = useState(false);
 
   useEffect(() => {
@@ -36,24 +37,35 @@ export function ModalRequisicaoCompras({ maquina, fechar }: ModalRequisicaoCompr
 
   const itensDoCiclo = itens.filter((i) => i.intervalo_horas === cicloSelecionado);
 
-  const textoRequisicao = `*REQUISIÇÃO DE PEÇAS & CONSUMÍVEIS - GE-NIO MECHANIQ*
+  const hAtual = Number(maquina.horimetro ?? 0);
+  const horasRestantes = Math.max(0, cicloSelecionado - hAtual);
+  const diasAteRevisao = Math.round(horasRestantes / 8);
+  const dataRevisao = new Date();
+  dataRevisao.setDate(dataRevisao.getDate() + diasAteRevisao);
+  
+  const diasMargemCompra = diasAteRevisao - leadTimeDias;
+  const dataLimiteCompra = new Date();
+  dataLimiteCompra.setDate(dataLimiteCompra.getDate() + Math.max(0, diasMargemCompra));
+
+  const textoRequisicao = `*REQUISIÇÃO DE PEÇAS & FILTROS IMPORTADOS // GE-NIO MECHANIQ*
 ----------------------------------------
-*Equipamento:* ${maquina.tag} (${maquina.marca} ${maquina.modelo})
-*Horímetro Atual:* ${maquina.horimetro ?? 0} h
-*Revisão Alvo:* ${cicloSelecionado} h
-*Lead Time Estimado:* ${leadTimeDias} dias
+🚜 *Equipamento:* ${maquina.tag} (${maquina.marca} ${maquina.modelo})
+⏱️ *Horímetro Atual:* ${hAtual} h (Base ~8h/dia)
+🎯 *Revisão Alvo:* ${cicloSelecionado} h (${horasRestantes}h restantes ~ ${diasAteRevisao} dias)
+📦 *Lead Time Importação:* ${leadTimeDias} dias
+📅 *Data Limite p/ Pedido:* ${dataLimiteCompra.toLocaleDateString("pt-BR")}
 ----------------------------------------
-*ITENS / EQUIVALÊNCIAS REQUISITADAS:*
-${itensDoCiclo.length === 0 ? '- Nenhum item cadastrado para este ciclo.' : itensDoCiclo.map((item, idx) => `
+*ITENS / EQUIVALÊNCIAS TÉCNICAS:*
+${itensDoCiclo.length === 0 ? "- Nenhum item cadastrado para este ciclo na Ficha Técnica." : itensDoCiclo.map((item, idx) => `
 ${idx + 1}. *${item.componente}*
-   - OEM (Original): ${item.codigo_original || 'N/D'}
-   - Mann Filter: ${item.equivalente_mann || 'N/D'}
-   - Donaldson: ${item.equivalente_donaldson || 'N/D'}
-   - Baldwin/Racor: ${item.equivalente_baldwin || item.equivalente_racor || 'N/D'}
-   - Capacidade/Especificação: ${item.capacidade_oleo || 'N/D'}
-`).join('')}
+   • OEM (Original): ${item.codigo_original || "N/D"}
+   • Donaldson: ${item.equivalente_donaldson || "N/D"}
+   • Mann Filter: ${item.equivalente_mann || "N/D"}
+   • Baldwin/Racor: ${item.equivalente_baldwin || item.equivalente_racor || "N/D"}
+   • Fluido/Capacidade: ${item.capacidade_oleo || "N/D"}
+`).join("")}
 ----------------------------------------
-Emitido via Ge-Nio Mechaniq Management System`;
+Emitido via Ge-Nio Mechaniq ERP`;
 
   function copiarTexto() {
     navigator.clipboard.writeText(textoRequisicao);
