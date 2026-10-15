@@ -17,7 +17,7 @@ import {
   Users, 
   LogOut, 
   X 
-} from "lucide-react";
+} , Search } from 'lucide-react';
 import {
   useEffect,
   useRef,
@@ -115,6 +115,23 @@ function compararNomes(a?: string | null, b?: string | null) {
 }
 
 export default function App() {
+  const [modalBuscaGlobalAberto, setModalBuscaGlobalAberto] = useState(false);
+  const [termoBuscaGlobal, setTermoBuscaGlobal] = useState("");
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setModalBuscaGlobalAberto((prev) => !prev);
+      }
+      if (e.key === "Escape") {
+        setModalBuscaGlobalAberto(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const [modalEditarChamadoAberto, setModalEditarChamadoAberto] = useState(false);
   const [chamadoEdicao, setChamadoEdicao] = useState<any>(null);
 
@@ -3080,6 +3097,37 @@ function Topo(props: {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+
+            <button
+              type="button"
+              onClick={() => setModalBuscaGlobalAberto(true)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                background: "#f1f5f9",
+                border: "1px solid #cbd5e1",
+                padding: "6px 12px",
+                borderRadius: "8px",
+                fontSize: "12px",
+                color: "#64748b",
+                cursor: "pointer",
+                marginRight: "12px"
+              }}
+            >
+              <Search size={14} color="#64748b" />
+              <span>Buscar máquina, OS...</span>
+              <kbd style={{
+                background: "#ffffff",
+                border: "1px solid #cbd5e1",
+                borderRadius: "4px",
+                padding: "1px 5px",
+                fontSize: "10px",
+                fontWeight: 700,
+                color: "#475569"
+              }}>Ctrl K</kbd>
+            </button>
+  
           {props.isMobile && (
             <button onClick={() => setMenuAberto(!menuAberto)} style={estilos.botaoMenuMobile}>☰</button>
           )}
