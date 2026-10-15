@@ -13,6 +13,7 @@ export function ModalFichaTecnica({ maquina, fechar, isAdmin }: ModalFichaTecnic
   const [carregando, setCarregando] = useState(true);
   const [filtroIntervalo, setFiltroIntervalo] = useState<number | 'todos'>('todos');
   const [adicionando, setAdicionando] = useState(false);
+  const [copiadoCotacao, setCopiadoCotacao] = useState(false);
 
   // Form states
   const [componente, setComponente] = useState('');
@@ -92,6 +93,54 @@ export function ModalFichaTecnica({ maquina, fechar, isAdmin }: ModalFichaTecnic
     } catch (err: any) {
       alert('Erro ao excluir: ' + err.message);
     }
+  }
+
+  
+  function copiarCotacaoFormatada() {
+    if (!maquina || itensFiltrados.length === 0) return;
+    
+    const cicloTexto = filtroIntervalo === "todos" ? "Todos os Ciclos" : `Ciclo ${filtroIntervalo}h`;
+    let texto = `*SOLICITAÇÃO DE COTAÇÃO // SUPRIMENTOS*
+`;
+    texto += `🚜 Equipamento: ${maquina.marca} ${maquina.modelo} (TAG: ${maquina.tag})
+`;
+    texto += `⏱️ Horímetro: ${maquina.horimetro ?? 0}h | ${cicloTexto}
+`;
+    texto += `----------------------------------------
+
+`;
+
+    itensFiltrados.forEach((item, index) => {
+      texto += `*${index + 1}. ${item.componente}* (Revisão: ${item.intervalo_horas}h)
+`;
+      if (item.codigo_original) texto += `   • Cód. Original: ${item.codigo_original}
+`;
+      
+      const equivs: string[] = [];
+      if (item.equivalente_donaldson) equivs.push(`Donaldson: ${item.equivalente_donaldson}`);
+      if (item.equivalente_mann) equivs.push(`Mann: ${item.equivalente_mann}`);
+      if (item.equivalente_baldwin) equivs.push(`Baldwin: ${item.equivalente_baldwin}`);
+      if (item.equivalente_racor) equivs.push(`Racor: ${item.equivalente_racor}`);
+      
+      if (equivs.length > 0) {
+        texto += `   • Equivalências: ${equivs.join(" | ")}
+`;
+      }
+      if (item.capacidade_oleo) {
+        texto += `   • Fluido/Capacidade: ${item.capacidade_oleo}
+`;
+      }
+      texto += `
+`;
+    });
+
+    texto += `----------------------------------------
+Enviado via Ge-Nio Mechaniq`;
+
+    navigator.clipboard.writeText(texto).then(() => {
+      setCopiadoCotacao(true);
+      setTimeout(() => setCopiadoCotacao(false), 2500);
+    });
   }
 
   if (!maquina) return null;
@@ -206,6 +255,29 @@ export function ModalFichaTecnica({ maquina, fechar, isAdmin }: ModalFichaTecnic
           </div>
 
           {isAdmin && (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <button
+              type="button"
+              onClick={copiarCotacaoFormatada}
+              disabled={itensFiltrados.length === 0}
+              style={{
+                background: copiadoCotacao ? "#16a34a" : "#0284c7",
+                color: "#ffffff",
+                border: "none",
+                padding: "6px 12px",
+                borderRadius: "6px",
+                fontSize: "12px",
+                fontWeight: 800,
+                cursor: itensFiltrados.length === 0 ? "not-allowed" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                transition: "all 0.2s ease",
+                opacity: itensFiltrados.length === 0 ? 0.6 : 1
+              }}
+            >
+              {copiadoCotacao ? "✓ Lista Copiada!" : "📋 Copiar Cotação (WhatsApp)"}
+            </button>
             <button
               onClick={() => setAdicionando(!adicionando)}
               style={{
@@ -221,6 +293,7 @@ export function ModalFichaTecnica({ maquina, fechar, isAdmin }: ModalFichaTecnic
             >
               {adicionando ? 'Cancelar' : '+ Cadastrar Peça / Filtro'}
             </button>
+          </div>
           )}
         </div>
 
