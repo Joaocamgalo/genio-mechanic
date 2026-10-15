@@ -1,3 +1,4 @@
+import { MapPin, User, Wrench, Share2, Pencil, Trash2, CheckCircle2, Eye, FileText, AlertTriangle } from "lucide-react";
 import {
   useEffect,
   useRef,
@@ -2024,192 +2025,367 @@ export default function App() {
                   chamadosFiltrados.map((c) => {
                     const fotoChamado = localStorage.getItem(`controlmaq_foto_${c.id}`);
                     return (
-                      <div key={c.id} className="cm-card" style={estilos.cardMaquinaNovo}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                          <div>
-                            <strong>{c.maquina}</strong>
-                            <span style={{ fontSize: '11px', color: '#94a3b8', marginLeft: '6px' }}>#{c.id}</span>
-                          </div>
-                          <span className={`cm-badge badge-${c.status.toLowerCase()}`}>{c.status}</span>
+                      <div 
+                      key={c.id} 
+                      style={{
+                        background: "#ffffff",
+                        borderRadius: "12px",
+                        border: "1px solid #e2e8f0",
+                        boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)",
+                        padding: "16px",
+                        marginBottom: "14px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "12px",
+                        textAlign: "left"
+                      }}
+                    >
+                      {/* Topo: TAG, ID e Status */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #f1f5f9", paddingBottom: "10px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ fontSize: "16px", fontWeight: 700, color: "#0f172a", letterSpacing: "-0.01em" }}>
+                            {c.maquina}
+                          </span>
+                          <span style={{ fontSize: "11px", fontWeight: 600, color: "#64748b", background: "#f8fafc", border: "1px solid #e2e8f0", padding: "2px 6px", borderRadius: "4px" }}>
+                            #{c.id}
+                          </span>
                         </div>
-                        <p style={{ margin: '0 0 8px', fontSize: '13px' }}>{c.problema}</p>
                         
-                        {fotoChamado && (
-                          <div style={{ marginBottom: '8px' }}>
-                            <img src={fotoChamado} alt="Evidência" style={{ width: '100%', maxHeight: '120px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e2e8f0' }} />
-                          </div>
-                        )}
+                        <span style={{
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
+                          padding: "3px 8px",
+                          borderRadius: "9999px",
+                          background: c.status === "Assumido" ? "#fef3c7" : c.status === "Finalizado" ? "#dcfce7" : "#e0f2fe",
+                          color: c.status === "Assumido" ? "#92400e" : c.status === "Finalizado" ? "#166534" : "#0369a1",
+                          border: `1px solid ${c.status === "Assumido" ? "#fde68a" : c.status === "Finalizado" ? "#bbf7d0" : "#bae6fd"}`
+                        }}>
+                          {c.status}
+                        </span>
+                      </div>
 
-                        <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '12px', display: 'grid', gap: '3px' }}>
-                          <div 
-    onClick={() => {
-      if (c.local) {
-        window.open("https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(c.local), "_blank");
-      }
-    }}
-    title="Abrir no Google Maps"
-    style={{ cursor: c.local ? "pointer" : "default", color: c.local ? "#0284c7" : "inherit", textDecoration: c.local ? "underline" : "none" }}
-  >
-    📍 {c.local || "Sem local informado"} 🗺️
-  </div>
-                          <div>👤 Solicitante: {c.solicitante}</div>
-                          {isAdmin && <div>🔧 Mecânico: <strong>{c.mecanico || 'Não designado'}</strong></div>}
+                      {/* Problema / Falha */}
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+                        <AlertTriangle size={15} color="#d97706" style={{ marginTop: "2px", flexShrink: 0 }} />
+                        <p style={{ margin: 0, fontSize: "13px", fontWeight: 600, color: "#334155", lineHeight: "1.4" }}>
+                          {c.problema}
+                        </p>
+                      </div>
+
+                      {/* Foto / Evidencia se houver */}
+                      {fotoChamado && (
+                        <div style={{ borderRadius: "8px", overflow: "hidden", border: "1px solid #e2e8f0", maxHeight: "140px" }}>
+                          <img src={fotoChamado} alt="Evidência" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        </div>
+                      )}
+
+                      {/* Box cinza com Dados Tecnicos e Local */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: "6px", background: "#f8fafc", padding: "10px 12px", borderRadius: "8px", border: "1px solid #f1f5f9" }}>
+                        <div 
+                          onClick={() => {
+                            if (c.local) {
+                              window.open("https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(c.local), "_blank");
+                            }
+                          }}
+                          title="Abrir rota no Google Maps"
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            fontSize: "12px",
+                            color: "#0284c7",
+                            cursor: c.local ? "pointer" : "default",
+                            fontWeight: 500
+                          }}
+                        >
+                          <MapPin size={14} color="#0284c7" style={{ flexShrink: 0 }} />
+                          <span style={{ textDecoration: c.local ? "underline" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {c.local || "Sem local informado"}
+                          </span>
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '6px' }}>
-                          <button onClick={() => { setChamadoDetalhes(c); setTela('detalhesChamado'); }} style={estilos.botaoAjustarHorimetro}>
-                            Ver
-                          </button>
-                          
-                          {isAdmin && c.status === 'Aberto' && (
-                            <button onClick={() => designarMecanicoAdmin(c.id)} style={estilos.botaoCardPrincipal}>
-                              Designar
-                            </button>
-                          )}
-
-                          {c.status === 'Assumido' && (
-                            <button onClick={() => abrirTelaFinalizar(c.id)} style={{ ...estilos.botaoCardPrincipal, background: '#16a34a' }}>
-                              Concluir OS
-                            </button>
-                          )}
-
-                          {c.status === 'Finalizado' && (
-                            <button onClick={() => gerarPdfChamado(c)} style={estilos.botaoCardPrincipal}>
-                              PDF
-                            </button>
-                          )}
-
-                          <button 
-                            type="button" 
-                            onClick={() => abrirEdicaoChamado(c)} 
-                            title="Editar Chamado"
-                            style={{ background: "#f8fafc", color: "#334155", border: "1px solid #cbd5e1", borderRadius: "6px", padding: "6px 10px", fontWeight: "bold", fontSize: "14px", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
-                          >
-                            ✏️
-                          </button>
-                          <button 
-      type="button" 
-      onClick={() => compartilharChamadoWhatsApp(c)} 
-      title="Compartilhar no WhatsApp"
-      style={{ background: "#25D366", color: "#fff", border: "none", borderRadius: "6px", padding: "6px 12px", fontWeight: "bold", fontSize: "14px", cursor: "pointer" }}
-    >
-      💬
-    </button>
-    {isAdmin && (
-    <button onClick={() => excluirChamado(c)} style={estilos.botaoExcluirOS}>🗑</button>
-  )}
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#64748b" }}>
+                          <User size={14} color="#94a3b8" style={{ flexShrink: 0 }} />
+                          <span>Solicitante: <strong style={{ color: "#334155" }}>{c.solicitante || "N/A"}</strong></span>
                         </div>
 
-                        {/* Modal de Edicao de Chamado */}
-                        {modalEditarChamadoAberto && chamadoEdicao && chamadoEdicao.id === c.id && (
-                          <div 
-                            className="modal-editar-chamado-dialog"
-                            style={{
-                              position: "fixed",
-                              top: 0,
-                              left: 0,
-                              width: "100vw",
-                              height: "100vh",
-                              background: "rgba(15, 23, 42, 0.75)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              zIndex: 99999,
-                              padding: "16px",
-                              boxSizing: "border-box"
-                            }}
-                          >
-                            <div style={{ background: "#ffffff", borderRadius: "12px", width: "100%", maxWidth: "480px", padding: "20px", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.3)", textAlign: "left" }}>
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                                <h3 style={{ margin: 0, fontSize: "17px", fontWeight: 700, color: "#0f172a" }}>
-                                  ✏️ Editar Chamado #{chamadoEdicao.id}
-                                </h3>
-                                <button 
-                                  type="button" 
-                                  onClick={() => setModalEditarChamadoAberto(false)}
-                                  style={{ background: "transparent", border: "none", fontSize: "18px", cursor: "pointer", color: "#64748b" }}
-                                >
-                                  ✕
-                                </button>
-                              </div>
-
-                              <form onSubmit={salvarEdicaoChamado} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                                <div>
-                                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#334155", marginBottom: "4px" }}>Máquina / TAG</label>
-                                  <input 
-                                    type="text" 
-                                    value={chamadoEdicao.maquina || ""} 
-                                    onChange={(e) => setChamadoEdicao({ ...chamadoEdicao, maquina: e.target.value })}
-                                    style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", boxSizing: "border-box" }}
-                                    required
-                                  />
-                                </div>
-
-                                <div>
-                                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#334155", marginBottom: "4px" }}>Problema / Reclamação</label>
-                                  <textarea 
-                                    rows={2}
-                                    value={chamadoEdicao.problema || ""} 
-                                    onChange={(e) => setChamadoEdicao({ ...chamadoEdicao, problema: e.target.value })}
-                                    style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", boxSizing: "border-box" }}
-                                    required
-                                  />
-                                </div>
-
-                                <div>
-                                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#334155", marginBottom: "4px" }}>Localização / Endereço</label>
-                                  <input 
-                                    type="text" 
-                                    value={chamadoEdicao.local || ""} 
-                                    onChange={(e) => setChamadoEdicao({ ...chamadoEdicao, local: e.target.value })}
-                                    style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", boxSizing: "border-box" }}
-                                    placeholder="Ex: Av. Raja Gabaglia, 1700..."
-                                  />
-                                </div>
-
-                                <div>
-                                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#334155", marginBottom: "4px" }}>Solicitante</label>
-                                  <input 
-                                    type="text" 
-                                    value={chamadoEdicao.solicitante || ""} 
-                                    onChange={(e) => setChamadoEdicao({ ...chamadoEdicao, solicitante: e.target.value })}
-                                    style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", boxSizing: "border-box" }}
-                                  />
-                                </div>
-
-                                <div>
-                                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#334155", marginBottom: "4px" }}>Mecânico Designado</label>
-                                  <input 
-                                    type="text" 
-                                    value={chamadoEdicao.mecanico || ""} 
-                                    onChange={(e) => setChamadoEdicao({ ...chamadoEdicao, mecanico: e.target.value })}
-                                    style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", boxSizing: "border-box" }}
-                                  />
-                                </div>
-
-                                <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "12px" }}>
-                                  <button 
-                                    type="button" 
-                                    onClick={() => setModalEditarChamadoAberto(false)}
-                                    style={{ padding: "8px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", background: "#f1f5f9", cursor: "pointer", fontWeight: 600 }}
-                                  >
-                                    Cancelar
-                                  </button>
-                                  <button 
-                                    type="submit"
-                                    style={{ padding: "8px 14px", borderRadius: "6px", border: "none", background: "#0284c7", color: "#fff", cursor: "pointer", fontWeight: 700 }}
-                                  >
-                                    Salvar Alterações
-                                  </button>
-                                </div>
-                              </form>
-                            </div>
+                        {isAdmin && (
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#64748b" }}>
+                            <Wrench size={14} color="#94a3b8" style={{ flexShrink: 0 }} />
+                            <span>Mecânico: <strong style={{ color: "#334155" }}>{c.mecanico || "Não designado"}</strong></span>
                           </div>
                         )}
                       </div>
-                    );
-                  })
-                )}
+
+                      {/* Barra de Acoes Profissional */}
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "2px" }}>
+                        <button 
+                          type="button"
+                          onClick={() => { setChamadoDetalhes(c); setTela("detalhesChamado"); }}
+                          style={{
+                            flex: 1,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "6px",
+                            height: "36px",
+                            background: "#ffffff",
+                            border: "1px solid #cbd5e1",
+                            borderRadius: "6px",
+                            fontSize: "13px",
+                            fontWeight: 600,
+                            color: "#334155",
+                            cursor: "pointer"
+                          }}
+                        >
+                          <Eye size={15} /> Ver
+                        </button>
+
+                        {c.status === "Assumido" && (
+                          <button 
+                            type="button"
+                            onClick={() => abrirTelaFinalizar(c.id)}
+                            style={{
+                              flex: 1.3,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "6px",
+                              height: "36px",
+                              background: "#16a34a",
+                              border: "none",
+                              borderRadius: "6px",
+                              fontSize: "13px",
+                              fontWeight: 600,
+                              color: "#ffffff",
+                              cursor: "pointer"
+                            }}
+                          >
+                            <CheckCircle2 size={15} /> Concluir OS
+                          </button>
+                        )}
+
+                        {isAdmin && c.status === "Aberto" && (
+                          <button 
+                            type="button"
+                            onClick={() => designarMecanicoAdmin(c.id)}
+                            style={{
+                              flex: 1.3,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "6px",
+                              height: "36px",
+                              background: "#0284c7",
+                              border: "none",
+                              borderRadius: "6px",
+                              fontSize: "13px",
+                              fontWeight: 600,
+                              color: "#ffffff",
+                              cursor: "pointer"
+                            }}
+                          >
+                            <Wrench size={15} /> Designar
+                          </button>
+                        )}
+
+                        {c.status === "Finalizado" && (
+                          <button 
+                            type="button"
+                            onClick={() => gerarPdfChamado(c)}
+                            style={{
+                              flex: 1,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "6px",
+                              height: "36px",
+                              background: "#0f172a",
+                              border: "none",
+                              borderRadius: "6px",
+                              fontSize: "13px",
+                              fontWeight: 600,
+                              color: "#ffffff",
+                              cursor: "pointer"
+                            }}
+                          >
+                            <FileText size={15} /> PDF
+                          </button>
+                        )}
+
+                        <button 
+                          type="button"
+                          onClick={() => abrirEdicaoChamado(c)}
+                          title="Editar Chamado"
+                          style={{
+                            width: "36px",
+                            height: "36px",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            background: "#ffffff",
+                            border: "1px solid #cbd5e1",
+                            borderRadius: "6px",
+                            color: "#475569",
+                            cursor: "pointer"
+                          }}
+                        >
+                          <Pencil size={15} />
+                        </button>
+
+                        <button 
+                          type="button"
+                          onClick={() => compartilharChamadoWhatsApp(c)}
+                          title="Compartilhar via WhatsApp com rota"
+                          style={{
+                            width: "36px",
+                            height: "36px",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            background: "#25D366",
+                            border: "none",
+                            borderRadius: "6px",
+                            color: "#ffffff",
+                            cursor: "pointer"
+                          }}
+                        >
+                          <Share2 size={15} />
+                        </button>
+
+                        {isAdmin && (
+                          <button 
+                            type="button"
+                            onClick={() => excluirChamado(c)}
+                            title="Excluir Chamado"
+                            style={{
+                              width: "36px",
+                              height: "36px",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              background: "#fef2f2",
+                              border: "1px solid #fee2e2",
+                              borderRadius: "6px",
+                              color: "#ef4444",
+                              cursor: "pointer"
+                            }}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Modal de Edicao embutido */}
+                      {modalEditarChamadoAberto && chamadoEdicao && chamadoEdicao.id === c.id && (
+                        <div 
+                          style={{
+                            position: "fixed",
+                            top: 0,
+                            left: 0,
+                            width: "100vw",
+                            height: "100vh",
+                            background: "rgba(15, 23, 42, 0.75)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            zIndex: 99999,
+                            padding: "16px",
+                            boxSizing: "border-box"
+                          }}
+                        >
+                          <div style={{ background: "#ffffff", borderRadius: "12px", width: "100%", maxWidth: "480px", padding: "20px", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.3)" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                              <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#0f172a" }}>
+                                Editar Ordem de Serviço #{chamadoEdicao.id}
+                              </h3>
+                              <button 
+                                type="button" 
+                                onClick={() => setModalEditarChamadoAberto(false)}
+                                style={{ background: "transparent", border: "none", fontSize: "18px", cursor: "pointer", color: "#64748b" }}
+                              >
+                                ✕
+                              </button>
+                            </div>
+
+                            <form onSubmit={salvarEdicaoChamado} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                              <div>
+                                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#334155", marginBottom: "4px" }}>Equipamento / TAG</label>
+                                <input 
+                                  type="text" 
+                                  value={chamadoEdicao.maquina || ""} 
+                                  onChange={(e) => setChamadoEdicao({ ...chamadoEdicao, maquina: e.target.value })}
+                                  style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", boxSizing: "border-box" }}
+                                  required
+                                />
+                              </div>
+
+                              <div>
+                                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#334155", marginBottom: "4px" }}>Descrição da Falha</label>
+                                <textarea 
+                                  rows={2}
+                                  value={chamadoEdicao.problema || ""} 
+                                  onChange={(e) => setChamadoEdicao({ ...chamadoEdicao, problema: e.target.value })}
+                                  style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", boxSizing: "border-box" }}
+                                  required
+                                />
+                              </div>
+
+                              <div>
+                                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#334155", marginBottom: "4px" }}>Localização / Endereço</label>
+                                <input 
+                                  type="text" 
+                                  value={chamadoEdicao.local || ""} 
+                                  onChange={(e) => setChamadoEdicao({ ...chamadoEdicao, local: e.target.value })}
+                                  style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", boxSizing: "border-box" }}
+                                />
+                              </div>
+
+                              <div>
+                                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#334155", marginBottom: "4px" }}>Solicitante</label>
+                                <input 
+                                  type="text" 
+                                  value={chamadoEdicao.solicitante || ""} 
+                                  onChange={(e) => setChamadoEdicao({ ...chamadoEdicao, solicitante: e.target.value })}
+                                  style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", boxSizing: "border-box" }}
+                                />
+                              </div>
+
+                              <div>
+                                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#334155", marginBottom: "4px" }}>Mecânico Designado</label>
+                                <input 
+                                  type="text" 
+                                  value={chamadoEdicao.mecanico || ""} 
+                                  onChange={(e) => setChamadoEdicao({ ...chamadoEdicao, mecanico: e.target.value })}
+                                  style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", boxSizing: "border-box" }}
+                                />
+                              </div>
+
+                              <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "10px" }}>
+                                <button 
+                                  type="button" 
+                                  onClick={() => setModalEditarChamadoAberto(false)}
+                                  style={{ padding: "8px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", background: "#f8fafc", cursor: "pointer", fontWeight: 600 }}
+                                >
+                                  Cancelar
+                                </button>
+                                <button 
+                                  type="submit"
+                                  style={{ padding: "8px 14px", borderRadius: "6px", border: "none", background: "#0284c7", color: "#fff", cursor: "pointer", fontWeight: 700 }}
+                                >
+                                  Salvar Alterações
+                                </button>
+                              </div>
+                            </form>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
               </div>
             )}
 
