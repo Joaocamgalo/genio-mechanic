@@ -129,8 +129,8 @@ export default function App() {
         setModalBuscaGlobalAberto(false);
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, []);
 
   const [modalEditarChamadoAberto, setModalEditarChamadoAberto] = useState(false);
@@ -2831,6 +2831,245 @@ export default function App() {
             </form>
           </div>
         )}
+      
+        {/* MODAL_BUSCA_GLOBAL_START */}
+        {modalBuscaGlobalAberto && (
+          <div
+            onClick={() => setModalBuscaGlobalAberto(false)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              backgroundColor: "rgba(15, 23, 42, 0.75)",
+              backdropFilter: "blur(6px)",
+              zIndex: 999999,
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "center",
+              padding: isMobile ? "20px 12px" : "60px 16px",
+              boxSizing: "border-box",
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: "100%",
+                maxWidth: "600px",
+                background: "#ffffff",
+                borderRadius: "16px",
+                boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.35)",
+                border: "1px solid #e2e8f0",
+                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
+                animation: "fadeIn 0.15s ease-out",
+              }}
+            >
+              {/* Barra de entrada de pesquisa */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "16px 18px",
+                  borderBottom: "1px solid #f1f5f9",
+                  gap: "12px",
+                  background: "#ffffff",
+                }}
+              >
+                <Search size={20} color="#0284c7" />
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Buscar máquina, TAG, OS, cliente ou problema..."
+                  value={termoBuscaGlobal}
+                  onChange={(e) => setTermoBuscaGlobal(e.target.value)}
+                  style={{
+                    border: "none",
+                    outline: "none",
+                    width: "100%",
+                    fontSize: "15px",
+                    fontWeight: 500,
+                    color: "#0f172a",
+                    background: "transparent",
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setModalBuscaGlobalAberto(false)}
+                  style={{
+                    background: "#f1f5f9",
+                    border: "none",
+                    padding: "4px 8px",
+                    borderRadius: "6px",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: "#64748b",
+                    cursor: "pointer",
+                  }}
+                >
+                  ESC
+                </button>
+              </div>
+
+              {/* Lista com scroll dos resultados */}
+              <div style={{ maxHeight: "380px", overflowY: "auto", padding: "10px" }}>
+                {/* Seção 1: Ordens de Serviço */}
+                <div style={{ fontSize: "10px", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px", padding: "6px 8px 4px" }}>
+                  Ordens de Serviço ({chamados.filter((c: any) => !termoBuscaGlobal || String(c.id).includes(termoBuscaGlobal) || (c.maquina && c.maquina.toLowerCase().includes(termoBuscaGlobal.toLowerCase())) || (c.problema && c.problema.toLowerCase().includes(termoBuscaGlobal.toLowerCase())) || (c.solicitante && c.solicitante.toLowerCase().includes(termoBuscaGlobal.toLowerCase()))).length})
+                </div>
+
+                {chamados
+                  .filter((c: any) =>
+                    !termoBuscaGlobal ||
+                    String(c.id).includes(termoBuscaGlobal) ||
+                    (c.maquina && c.maquina.toLowerCase().includes(termoBuscaGlobal.toLowerCase())) ||
+                    (c.problema && c.problema.toLowerCase().includes(termoBuscaGlobal.toLowerCase())) ||
+                    (c.solicitante && c.solicitante.toLowerCase().includes(termoBuscaGlobal.toLowerCase()))
+                  )
+                  .slice(0, 6)
+                  .map((c: any) => (
+                    <div
+                      key={"os-" + c.id}
+                      onClick={() => {
+                        setChamadoDetalhes(c);
+                        setTela("detalhesChamado");
+                        setModalBuscaGlobalAberto(false);
+                        setTermoBuscaGlobal("");
+                      }}
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: "8px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        cursor: "pointer",
+                        marginBottom: "4px",
+                        border: "1px solid transparent",
+                        background: "#ffffff",
+                        transition: "all 0.15s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#f8fafc";
+                        e.currentTarget.style.borderColor = "#e2e8f0";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "#ffffff";
+                        e.currentTarget.style.borderColor = "transparent";
+                      }}
+                    >
+                      <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <div style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a" }}>
+                          OS #{c.id} — {c.maquina}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>
+                          {c.problema || "Sem descrição"}
+                        </div>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          padding: "3px 8px",
+                          borderRadius: "6px",
+                          background: c.status === "Concluído" ? "#dcfce7" : c.status === "Em Andamento" ? "#fef3c7" : "#e0f2fe",
+                          color: c.status === "Concluído" ? "#15803d" : c.status === "Em Andamento" ? "#b45309" : "#0369a1",
+                          whiteSpace: "nowrap",
+                          marginLeft: "12px",
+                        }}
+                      >
+                        {c.status}
+                      </span>
+                    </div>
+                  ))}
+
+                {/* Seção 2: Frota de Máquinas */}
+                <div style={{ fontSize: "10px", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px", padding: "12px 8px 4px" }}>
+                  Frota de Máquinas ({maquinas.filter((m: any) => !termoBuscaGlobal || (m.tag && m.tag.toLowerCase().includes(termoBuscaGlobal.toLowerCase())) || (m.modelo && m.modelo.toLowerCase().includes(termoBuscaGlobal.toLowerCase())) || (m.cliente && m.cliente.toLowerCase().includes(termoBuscaGlobal.toLowerCase()))).length})
+                </div>
+
+                {maquinas
+                  .filter((m: any) =>
+                    !termoBuscaGlobal ||
+                    (m.tag && m.tag.toLowerCase().includes(termoBuscaGlobal.toLowerCase())) ||
+                    (m.modelo && m.modelo.toLowerCase().includes(termoBuscaGlobal.toLowerCase())) ||
+                    (m.cliente && m.cliente.toLowerCase().includes(termoBuscaGlobal.toLowerCase()))
+                  )
+                  .slice(0, 6)
+                  .map((m: any) => (
+                    <div
+                      key={"maq-" + m.id}
+                      onClick={() => {
+                        setTela("maquinas");
+                        setModalBuscaGlobalAberto(false);
+                        setTermoBuscaGlobal("");
+                      }}
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: "8px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        cursor: "pointer",
+                        marginBottom: "4px",
+                        border: "1px solid transparent",
+                        background: "#ffffff",
+                        transition: "all 0.15s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#f8fafc";
+                        e.currentTarget.style.borderColor = "#e2e8f0";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "#ffffff";
+                        e.currentTarget.style.borderColor = "transparent";
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a" }}>
+                          🚜 {m.tag || m.nome} — {m.modelo || "Equipamento"}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>
+                          Cliente: {m.cliente || "Pátio"} · Horímetro: <strong>{m.horimetro_atual || m.horimetro || 0} h</strong>
+                        </div>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: "10px",
+                          fontWeight: 700,
+                          padding: "2px 6px",
+                          borderRadius: "4px",
+                          background: "#f1f5f9",
+                          color: "#475569",
+                          border: "1px solid #cbd5e1",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Ver Frota
+                      </span>
+                    </div>
+                  ))}
+              </div>
+
+              {/* Rodapé informativo */}
+              <div
+                style={{
+                  padding: "10px 16px",
+                  background: "#f8fafc",
+                  borderTop: "1px solid #f1f5f9",
+                  fontSize: "11px",
+                  color: "#64748b",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <span>Navegue e clique para abrir os detalhes</span>
+                <span>Pressione <strong>ESC</strong> para sair</span>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* MODAL_BUSCA_GLOBAL_END */}
+
       </main>
     </div>
   );
