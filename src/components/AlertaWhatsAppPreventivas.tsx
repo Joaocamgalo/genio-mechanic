@@ -1,149 +1,130 @@
-import { useState } from 'react';
-import type { Maquina } from '../types/controlmaq';
+import React, { useState } from "react";
+import { Send, Copy, AlertCircle, CheckCircle2 } from "lucide-react";
 
 interface AlertaWhatsAppPreventivasProps {
   preventivas: any[];
-  maquinas: Maquina[];
+  maquinas: any[];
 }
 
 export function AlertaWhatsAppPreventivas({ preventivas, maquinas }: AlertaWhatsAppPreventivasProps) {
-  const [telefone, setTelefone] = useState('');
+  const [telefone, setTelefone] = useState("");
   const [copiado, setCopiado] = useState(false);
 
-  // Considera todas as preventivas críticas passadas ou filtra vencida/proxima/critica
-  const maquinasAtencao = preventivas.length > 0
-    ? preventivas
-    : [];
+  const totalCriticas = preventivas ? preventivas.length : 0;
 
-  const dataAtual = new Date().toLocaleDateString('pt-BR');
+  const gerarTextoResumo = () => {
+    const dataHoje = new Date().toLocaleDateString("pt-BR");
+    let msg = "*GE-NIO MECHANIQ - ALERTA DE PREVENTIVAS CRÍTICAS (" + dataHoje + ")*\n";
+    msg += "----------------------------------------\n";
+    msg += "*Total de equipamentos em atenção:* " + totalCriticas + "\n\n";
 
-  const textoAlerta = `*🚨 GE-NIO MECHANIQ - ALERTA DE PREVENTIVAS CRÍTICAS (${dataAtual})*
---------------------------------------------------
-*Total de equipamentos em atenção:* ${maquinasAtencao.length}
+    if (totalCriticas === 0) {
+      msg += "✓ Nenhuma máquina com revisão vencida no momento.\n";
+    } else {
+      preventivas.forEach((p: any, idx: number) => {
+        msg += (idx + 1) + ". *" + (p.maquina_tag || p.tag || "Máquina") + "* - " + (p.tipo || "Revisão") + "\n";
+      });
+    }
 
-${maquinasAtencao.length === 0 ? '✓ Nenhuma máquina com revisão vencida no momento.' : maquinasAtencao.map((p, idx) => {
-  const tagIdentificada = p.tag || p.maquina_tag || 'S/ TAG';
-  const maq = maquinas.find((m) => m.tag === tagIdentificada);
-  const statusFormatado = (p.status || 'VENCIDA').toUpperCase();
-  const horimetroAtual = p.horimetro_atual ?? p.horimetro ?? maq?.horimetro_atual ?? 0;
-  const proximaRevisao = p.proxima_revisao_horas ?? p.proxima_revisao ?? p.proximo_horimetro ?? 'Pendente';
-  const saldoHoras = p.horas_restantes ?? p.saldo_horas ?? 0;
-  const clienteNome = maq?.cliente || p.cliente || 'Pátio';
-  const localNome = maq?.local || p.local || 'Base';
+    msg += "----------------------------------------\n";
+    msg += "*Ação necessária:* Programar envio de kits de filtros ou parada técnica imediata.\n";
+    msg += "Painel Ge-Nio Mechaniq Fleet Operations";
+    return msg;
+  };
 
-  return `${idx + 1}. *TAG ${tagIdentificada}* (${maq?.modelo || 'Equipamento'})
-   - Status: 🔴 ${statusFormatado}
-   - Horímetro Atual: ${horimetroAtual}h
-   - Revisão Alvo: ${proximaRevisao}h
-   - Situação: ${saldoHoras < 0 ? `Vencida há ${Math.abs(saldoHoras)}h` : `Atenção imediata (${saldoHoras}h)`}
-   - Cliente / Local: ${clienteNome} (${localNome})
-`;
-}).join('\n')}
---------------------------------------------------
-*Ação necessária:* Programar envio de kits de filtros ou parada técnica imediata.
-Painel Ge-Nio Mechaniq Fleet Operations`;
+  const dispararWhatsApp = () => {
+    const texto = gerarTextoResumo();
+    const telLimpo = telefone.replace(/\D/g, "");
+    const url = telLimpo 
+      ? "https://api.whatsapp.com/send?phone=55" + telLimpo + "&text=" + encodeURIComponent(texto)
+      : "https://api.whatsapp.com/send?text=" + encodeURIComponent(texto);
+    window.open(url, "_blank");
+  };
 
-  function copiar() {
-    navigator.clipboard.writeText(textoAlerta);
+  const copiarResumo = () => {
+    navigator.clipboard.writeText(gerarTextoResumo());
     setCopiado(true);
     setTimeout(() => setCopiado(false), 2500);
-  }
-
-  function enviarWhatsApp() {
-    const foneLimpo = telefone.replace(/\D/g, '');
-    const url = foneLimpo
-      ? `https://api.whatsapp.com/send?phone=55${foneLimpo}&text=${encodeURIComponent(textoAlerta)}`
-      : `https://api.whatsapp.com/send?text=${encodeURIComponent(textoAlerta)}`;
-    window.open(url, '_blank');
-  }
+  };
 
   return (
     <div style={{
-      background: '#ffffff',
-      border: '1px solid #e2e8f0',
-      borderLeft: '5px solid #d97706',
-      borderRadius: '10px',
-      padding: '16px',
-      marginTop: '16px',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
+      background: "#ffffff",
+      borderRadius: "12px",
+      border: "1px solid #e2e8f0",
+      boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+      padding: "16px 20px",
+      marginBottom: "16px"
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
-        <div>
-          <span style={{ fontSize: '11px', fontWeight: 800, color: '#d97706', textTransform: 'uppercase' }}>
-            DESPACHO PROATIVO // NOTIFICAÇÃO OFICINA
-          </span>
-          <h4 style={{ margin: '2px 0 0', fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
-            Disparo de Preventivas Críticas via WhatsApp
-          </h4>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: totalCriticas > 0 ? "#fef3c7" : "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {totalCriticas > 0 ? <AlertCircle size={18} color="#d97706" /> : <CheckCircle2 size={18} color="#16a34a" />}
+          </div>
+          <div>
+            <h4 style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "#0f172a" }}>
+              Notificação de Preventivas da Frota
+            </h4>
+            <span style={{ fontSize: "12px", color: "#64748b" }}>
+              {totalCriticas === 0 ? "Todas as revisões preventivas em dia" : totalCriticas + " equipamento(s) requerem atenção"}
+            </span>
+          </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <input
-            type="tel"
+            type="text"
+            placeholder="DDD + Telefone (opcional)"
             value={telefone}
             onChange={(e) => setTelefone(e.target.value)}
-            placeholder="DDD + Telefone Encarregado (opcional)"
             style={{
-              padding: '6px 10px',
-              borderRadius: '6px',
-              border: '1px solid #cbd5e1',
-              fontSize: '12px',
-              width: '240px',
+              padding: "7px 12px",
+              borderRadius: "8px",
+              border: "1px solid #cbd5e1",
+              fontSize: "12px",
+              width: "180px"
             }}
           />
           <button
             type="button"
-            onClick={copiar}
+            onClick={copiarResumo}
+            title="Copiar texto para área de transferência"
             style={{
-              background: copiado ? '#16a34a' : '#0f172a',
-              color: '#ffffff',
-              border: 'none',
-              padding: '6px 12px',
-              borderRadius: '6px',
-              fontSize: '11px',
-              fontWeight: 800,
-              cursor: 'pointer',
+              padding: "7px 12px",
+              borderRadius: "8px",
+              border: "1px solid #cbd5e1",
+              background: "#ffffff",
+              color: "#334155",
+              fontSize: "12px",
+              fontWeight: 600,
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px"
             }}
           >
-            {copiado ? '✓ Copiado!' : '📋 Copiar Resumo'}
+            <Copy size={14} /> {copiado ? "Copiado!" : "Copiar"}
           </button>
           <button
             type="button"
-            onClick={enviarWhatsApp}
+            onClick={dispararWhatsApp}
             style={{
-              background: '#22c55e',
-              color: '#ffffff',
-              border: 'none',
-              padding: '6px 14px',
-              borderRadius: '6px',
-              fontSize: '11px',
-              fontWeight: 800,
-              cursor: 'pointer',
+              padding: "7px 14px",
+              borderRadius: "8px",
+              border: "none",
+              background: "#25D366",
+              color: "#ffffff",
+              fontSize: "12px",
+              fontWeight: 700,
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px"
             }}
           >
-            📱 Disparar WhatsApp ({maquinasAtencao.length})
+            <Send size={14} /> Enviar via WhatsApp ({totalCriticas})
           </button>
         </div>
-      </div>
-
-      <div style={{
-        background: '#0f172a',
-        borderRadius: '6px',
-        padding: '12px',
-        maxHeight: '130px',
-        overflowY: 'auto',
-      }}>
-        <pre style={{
-          margin: 0,
-          fontFamily: 'monospace',
-          fontSize: '11px',
-          color: '#fbbf24',
-          whiteSpace: 'pre-wrap',
-          wordBreak: 'break-word',
-          lineHeight: '1.4',
-        }}>
-          {textoAlerta}
-        </pre>
       </div>
     </div>
   );

@@ -1519,9 +1519,7 @@ export default function App() {
                 type="button"
                 onClick={() => setModalAuditoriaAberto(true)}
                 style={{
-                  background: "#0f172a",
-                  color: "#93c5fd",
-                  border: "1px solid #334155",
+                  background: "#ffffff", color: "#334155", border: "1px solid #cbd5e1",
                   padding: "8px 16px",
                   borderRadius: "8px",
                   fontSize: "12px",
@@ -1533,7 +1531,7 @@ export default function App() {
                   boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
                 }}
               >
-                🛠 Painel de Auditoria & Homologação
+                Painel de Auditoria
               </button>
             </div>
             <AlertaWhatsAppPreventivas preventivas={preventivasCriticas} maquinas={maquinas} />

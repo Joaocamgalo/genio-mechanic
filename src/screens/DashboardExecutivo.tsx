@@ -226,7 +226,7 @@ export function DashboardExecutivo({
           padding: isMobile ? "20px" : "28px",
           background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)",
           border: "1px solid #e2e8f0",
-          borderLeft: "4px solid #f59e0b",
+          border: "1px solid #e2e8f0",
           borderRadius: "12px",
           boxShadow: "0 4px 6px -1px rgba(15, 23, 42, 0.05)"
         }}>
@@ -237,7 +237,7 @@ export function DashboardExecutivo({
             </div>
           </div>
           <h2 style={{ ...styles.heroTitulo, fontSize: isMobile ? '20px' : '26px' }}>
-            Painel Técnico de Operações
+            Visão Geral Operacional
           </h2>
           <p style={styles.heroSubtitulo}>
             Olá, <strong>{usuario?.nome || 'Gestor'}</strong>. Atualmente existem{' '}
@@ -445,7 +445,7 @@ export function DashboardExecutivo({
       <div style={{
         background: "#0f172a",
         border: "1px solid #334155",
-        borderLeft: "4px solid #f59e0b",
+        border: "1px solid #e2e8f0",
         borderRadius: "10px",
         padding: isMobile ? "16px" : "20px 24px",
         boxShadow: "0 4px 12px rgba(15, 23, 42, 0.15)",
@@ -647,7 +647,7 @@ export function DashboardExecutivo({
                       gap: isMobile ? "10px" : "12px",
                       background: "#ffffff",
                       border: "1px solid #fee2e2",
-                      borderLeft: "3px solid #dc2626",
+                      border: "1px solid #e2e8f0",
                       borderRadius: "8px",
                       padding: "10px 14px",
                       boxShadow: "0 1px 2px rgba(220, 38, 38, 0.05)",
@@ -741,7 +741,7 @@ export function DashboardExecutivo({
             color: "#ffffff",
             padding: "12px 16px",
             borderRadius: "8px",
-            borderLeft: "3px solid #38bdf8",
+            border: "1px solid #e2e8f0",
             marginBottom: "14px"
           }}>
             <div>
