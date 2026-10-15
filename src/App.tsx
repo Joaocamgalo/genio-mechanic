@@ -1761,13 +1761,16 @@ export default function App() {
                       dataEstimada.setDate(dataEstimada.getDate() + diasEstimados);
                       const dataFormatada = dataEstimada.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 
+                      // Regras de Alerta e Lead Time:
+                      // - Crítico: <= 10 horas (ou 1 dia)
+                      // - Alerta Pedido Filtros / Importação: <= 45 dias (ou <= 360 horas)
                       const isCritico = horasRestantes <= 10;
-                      const isAtencao = horasRestantes <= 35 && !isCritico;
+                      const isAlertaFiltros = diasEstimados <= 45 && !isCritico;
 
                       return (
                         <div style={{
-                          background: isCritico ? "#fff1f2" : isAtencao ? "#fffbeb" : "#f8fafc",
-                          border: isCritico ? "1px solid #fecdd3" : isAtencao ? "1px solid #fde68a" : "1px solid #e2e8f0",
+                          background: isCritico ? "#fff1f2" : isAlertaFiltros ? "#fefce8" : "#f8fafc",
+                          border: isCritico ? "1px solid #fecdd3" : isAlertaFiltros ? "1px solid #fde047" : "1px solid #e2e8f0",
                           borderRadius: "10px",
                           padding: "10px 12px",
                           marginBottom: "12px",
@@ -1782,9 +1785,26 @@ export default function App() {
                                 {hAtual} <span style={{ fontSize: "12px", fontWeight: 600, color: "#64748b" }}>h</span>
                               </div>
                             </div>
-                            <button onClick={() => alterarHorimetroManual(maquina)} style={{ ...estilos.botaoAjustarHorimetro, borderRadius: "6px" }}>
-                              Ajustar
-                            </button>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              {isAlertaFiltros && (
+                                <span style={{
+                                  background: "#fef08a",
+                                  border: "1px solid #eab308",
+                                  color: "#854d0e",
+                                  fontSize: "9px",
+                                  fontWeight: 800,
+                                  padding: "3px 6px",
+                                  borderRadius: "4px",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.4px"
+                                }}>
+                                  📦 Pedir Filtros
+                                </span>
+                              )}
+                              <button onClick={() => alterarHorimetroManual(maquina)} style={{ ...estilos.botaoAjustarHorimetro, borderRadius: "6px" }}>
+                                Ajustar
+                              </button>
+                            </div>
                           </div>
 
                           {/* Barra de Progresso do Ciclo Preventivo */}
@@ -1820,7 +1840,11 @@ export default function App() {
                               fontWeight: 700,
                               color: isCritico ? "#be123c" : isAtencao ? "#b45309" : "#334155"
                             }}>
-                              {horasRestantes === 0 ? "🚨 Manutenção Urgente" : `~ ${diasEstimados} dias (${dataFormatada})`}
+                              {horasRestantes === 0 
+        ? "🚨 Revisão Vencida" 
+        : isAlertaFiltros 
+        ? `⚠️ ~ ${diasEstimados} dias (${dataFormatada}) · Providenciar Peças` 
+        : `~ ${diasEstimados} dias (${dataFormatada})`}
                             </span>
                           </div>
                         </div>
