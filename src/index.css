@@ -317,3 +317,150 @@ code {
     margin: auto !important;
   }
 }
+
+/* =========================================================
+   GE-NIO MECHANIQ - DESIGN SYSTEM CORPORATIVO
+   ========================================================= */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+:root {
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  
+  /* Paleta Corporativa */
+  --bg-app: #f8fafc;
+  --bg-card: #ffffff;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --border-color: #e2e8f0;
+  --border-focus: #0284c7;
+
+  /* Cores de Acao */
+  --primary: #0284c7;
+  --primary-hover: #0369a1;
+  --success: #16a34a;
+  --success-hover: #15803d;
+  --danger: #ef4444;
+  --danger-hover: #dc2626;
+  --danger-bg: #fef2f2;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
+  margin: 0;
+  padding: 0;
+}
+
+/* ================= PADRONIZACAO GERAL DE BOTOES ================= */
+button, .cm-btn {
+  font-family: var(--font-sans) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  transition: all 0.15s ease-in-out !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  box-sizing: border-box !important;
+  text-decoration: none !important;
+}
+
+/* Efeito ao passar o rato e clique em todos os botoes */
+button:hover, .cm-btn:hover {
+  filter: brightness(0.96);
+  transform: translateY(-1px);
+}
+button:active, .cm-btn:active {
+  transform: translateY(0);
+}
+
+/* Botoes Primarios / Principais */
+button[style*="background: rgb(2, 132, 199)"],
+button[style*="background:#0284c7"],
+button[style*="background: #0284c7"],
+.btn-primary {
+  background: var(--primary) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 1px 2px rgba(2, 132, 199, 0.2) !important;
+}
+
+/* Botoes Sucesso / Concluir */
+button[style*="background: #16a34a"],
+button[style*="background:#16a34a"],
+.btn-success {
+  background: var(--success) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 1px 2px rgba(22, 163, 74, 0.2) !important;
+}
+
+/* Botoes Secundarios / Ver / Cancelar */
+button[style*="background: #ffffff"],
+button[style*="background:#ffffff"],
+button[style*="background: rgb(255, 255, 255)"],
+.btn-secondary {
+  background: #ffffff !important;
+  border: 1px solid var(--border-color) !important;
+  color: #334155 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+button[style*="background: #ffffff"]:hover,
+.btn-secondary:hover {
+  background: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Botoes de Acao de Excluir / Perigo */
+button[style*="background: #fee2e2"],
+button[style*="background: #fef2f2"],
+.btn-danger {
+  background: var(--danger-bg) !important;
+  border: 1px solid #fecaca !important;
+  color: var(--danger) !important;
+}
+
+/* ================= PADRONIZACAO DE INPUTS E PESQUISAS ================= */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+input[type="date"],
+select,
+textarea {
+  font-family: var(--font-sans) !important;
+  font-size: 13px !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--border-color) !important;
+  padding: 8px 12px !important;
+  background-color: #ffffff !important;
+  color: var(--text-main) !important;
+  outline: none !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+  box-sizing: border-box !important;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--border-focus) !important;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15) !important;
+}
+
+/* ================= CARTÕES E CONTENTORES (CARDS) ================= */
+.cm-card, [style*="cardMaquinaNovo"] {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* ================= ABAS E FILTROS (TABS) ================= */
+.aba-item, [style*="botaoFiltro"] {
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  padding: 6px 14px !important;
+}
