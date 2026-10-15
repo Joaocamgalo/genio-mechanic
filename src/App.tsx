@@ -16,8 +16,9 @@ import {
   Gauge, 
   Users, 
   LogOut, 
-  X 
-} , Search } from 'lucide-react';
+  X,
+  Search
+} from "lucide-react";
 import {
   useEffect,
   useRef,
