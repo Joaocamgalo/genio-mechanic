@@ -1755,8 +1755,8 @@ export default function App() {
                       const horasRestantes = proximaRevisao - hAtual;
                       const progressoCiclo = Math.min(100, Math.max(0, Math.round(((ciclo - horasRestantes) / ciclo) * 100)));
                       
-                      // Estimativa de dias (media padrao de 6h/dia)
-                      const diasEstimados = Math.max(0, Math.round(horasRestantes / 6));
+                      // Estimativa preditiva baseada em turno padrão de 8h/dia
+                      const diasEstimados = Math.max(0, Math.round(horasRestantes / 8));
                       const dataEstimada = new Date();
                       dataEstimada.setDate(dataEstimada.getDate() + diasEstimados);
                       const dataFormatada = dataEstimada.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
@@ -1815,7 +1815,7 @@ export default function App() {
                             paddingTop: "4px",
                             borderTop: "1px dashed rgba(0,0,0,0.06)"
                           }}>
-                            <span style={{ color: "#64748b" }}>Previsão de intervenção:</span>
+                            <span style={{ color: "#64748b" }}>Previsão (~8h/dia):</span>
                             <span style={{
                               fontWeight: 700,
                               color: isCritico ? "#be123c" : isAtencao ? "#b45309" : "#334155"
