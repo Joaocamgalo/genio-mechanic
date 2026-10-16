@@ -1630,6 +1630,198 @@ export default function App() {
                   Registrar leitura
                 </button>
 
+      {/* MODAL APONTAMENTO RAPIDO DE HORIMETRO */}
+      {modalLeituraRapidaAberto && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(15, 23, 42, 0.65)",
+          backdropFilter: "blur(4px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 99999,
+          padding: "16px"
+        }}>
+          <div style={{
+            background: "#ffffff",
+            borderRadius: "16px",
+            width: "100%",
+            maxWidth: "480px",
+            padding: "24px",
+            boxShadow: "0 20px 25px -5px rgba(0,0,0,0.2)",
+            border: "1px solid #e2e8f0"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div style={{ width: "38px", height: "38px", borderRadius: "10px", background: "#fff7ed", color: "#ea580c", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Gauge size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#0f172a" }}>Registrar Horímetro</h3>
+                  <span style={{ fontSize: "12px", color: "#64748b" }}>Atualização diária da frota</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalLeituraRapidaAberto(false)}
+                style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer", padding: "4px" }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!maquinaLeituraRapidaId) {
+                alert("Por favor, selecione um equipamento.");
+                return;
+              }
+
+              const maq = maquinas.find(m => m.id.toString() === maquinaLeituraRapidaId);
+              if (!maq) return;
+
+              const novoH = Number(valorNovoHorimetro);
+              const atualH = Number(maq.horimetro || 0);
+
+              if (isNaN(novoH) || novoH < atualH) {
+                alert("O novo horímetro não pode ser menor que o atual (" + atualH.toLocaleString("pt-BR") + " h).");
+                return;
+              }
+
+              try {
+                setSalvando(true);
+                const agora = new Date().toISOString();
+                await supabase.from("maquinas").update({ horimetro: novoH, atualizado_em: agora }).eq("id", maq.id);
+                await supabase.from("leituras_horimetro").insert({
+                  maquina_id: maq.id,
+                  maquina_tag: maq.tag,
+                  horimetro: novoH,
+                  responsavel: usuarioLogado?.nome || "Responsável",
+                  origem: "painel_rapido"
+                });
+
+                setMaquinas(prev => prev.map(m => m.id === maq.id ? { ...m, horimetro: novoH } : m));
+                setModalLeituraRapidaAberto(false);
+                alert("Horímetro do equipamento " + maq.tag + " atualizado para " + novoH.toLocaleString("pt-BR") + " h com sucesso!");
+              } catch (err) {
+                alert("Erro ao gravar leitura de horímetro.");
+              } finally {
+                setSalvando(false);
+              }
+            }}>
+              <div style={{ marginBottom: "16px" }}>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#334155", marginBottom: "6px" }}>
+                  Equipamento *
+                </label>
+                <select
+                  value={maquinaLeituraRapidaId}
+                  onChange={(e) => {
+                    const idEscolhido = e.target.value;
+                    setMaquinaLeituraRapidaId(idEscolhido);
+                    const maqSel = maquinas.find(x => x.id.toString() === idEscolhido);
+                    setValorNovoHorimetro(maqSel ? String(maqSel.horimetro || "") : "");
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: "8px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "14px",
+                    color: "#0f172a",
+                    background: "#ffffff"
+                  }}
+                  required
+                >
+                  <option value="">Selecione o equipamento...</option>
+                  {[...maquinas]
+                    .sort((a, b) => a.tag.localeCompare(b.tag))
+                    .map(m => (
+                      <option key={m.id} value={m.id}>
+                        {m.tag} — {m.modelo || m.marca || "Equipamento"} (Atual: {Number(m.horimetro || 0).toLocaleString("pt-BR")} h)
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              {maquinaLeituraRapidaId && (() => {
+                const maqSel = maquinas.find(x => x.id.toString() === maquinaLeituraRapidaId);
+                return (
+                  <div style={{ background: "#f8fafc", padding: "10px 14px", borderRadius: "8px", border: "1px solid #e2e8f0", marginBottom: "16px" }}>
+                    <div style={{ fontSize: "12px", color: "#64748b" }}>Último registro confirmado:</div>
+                    <div style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a" }}>
+                      {Number(maqSel?.horimetro || 0).toLocaleString("pt-BR")} horas
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div style={{ marginBottom: "24px" }}>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#334155", marginBottom: "6px" }}>
+                  Novo Horímetro Acumulado (Horas) *
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  value={valorNovoHorimetro}
+                  onChange={(e) => setValorNovoHorimetro(e.target.value)}
+                  placeholder="Ex: 2950"
+                  disabled={!maquinaLeituraRapidaId}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: "8px",
+                    border: maquinaLeituraRapidaId ? "2px solid #ea580c" : "1px solid #cbd5e1",
+                    fontSize: "16px",
+                    fontWeight: 700,
+                    color: "#0f172a",
+                    background: maquinaLeituraRapidaId ? "#ffffff" : "#f1f5f9"
+                  }}
+                  required
+                />
+              </div>
+
+              <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  onClick={() => setModalLeituraRapidaAberto(false)}
+                  style={{
+                    padding: "9px 16px",
+                    borderRadius: "8px",
+                    border: "1px solid #cbd5e1",
+                    background: "#ffffff",
+                    color: "#64748b",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    cursor: "pointer"
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={salvando || !maquinaLeituraRapidaId}
+                  style={{
+                    padding: "9px 20px",
+                    borderRadius: "8px",
+                    border: "none",
+                    background: !maquinaLeituraRapidaId ? "#94a3b8" : "#ea580c",
+                    color: "#ffffff",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    cursor: !maquinaLeituraRapidaId ? "not-allowed" : "pointer",
+                    boxShadow: !maquinaLeituraRapidaId ? "none" : "0 2px 4px rgba(234, 88, 12, 0.3)"
+                  }}
+                >
+                  {salvando ? "Salvando..." : "Confirmar Leitura"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+
                 <button
                   type="button"
                   onClick={() => {
@@ -3796,198 +3988,7 @@ function QuadroAssinaturaDigital(props: { onChange: (dataUrl: string) => void })
         Limpar Assinatura
       </button>
     </div>
-        {/* MODAL APONTAMENTO RAPIDO DE HORIMETRO */}
-      {modalLeituraRapidaAberto && (
-        <div style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(15, 23, 42, 0.65)",
-          backdropFilter: "blur(4px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: 99999,
-          padding: "16px"
-        }}>
-          <div style={{
-            background: "#ffffff",
-            borderRadius: "16px",
-            width: "100%",
-            maxWidth: "480px",
-            padding: "24px",
-            boxShadow: "0 20px 25px -5px rgba(0,0,0,0.2)",
-            border: "1px solid #e2e8f0"
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <div style={{ width: "38px", height: "38px", borderRadius: "10px", background: "#fff7ed", color: "#ea580c", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Gauge size={20} />
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#0f172a" }}>Registrar Horímetro</h3>
-                  <span style={{ fontSize: "12px", color: "#64748b" }}>Atualização diária da frota</span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setModalLeituraRapidaAberto(false)}
-                style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer", padding: "4px" }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              if (!maquinaLeituraRapidaId) {
-                alert("Por favor, selecione um equipamento.");
-                return;
-              }
-
-              const maq = maquinas.find(m => m.id.toString() === maquinaLeituraRapidaId);
-              if (!maq) return;
-
-              const novoH = Number(valorNovoHorimetro);
-              const atualH = Number(maq.horimetro || 0);
-
-              if (isNaN(novoH) || novoH < atualH) {
-                alert("O novo horímetro não pode ser menor que o atual (" + atualH.toLocaleString("pt-BR") + " h).");
-                return;
-              }
-
-              try {
-                setSalvando(true);
-                const agora = new Date().toISOString();
-                await supabase.from("maquinas").update({ horimetro: novoH, atualizado_em: agora }).eq("id", maq.id);
-                await supabase.from("leituras_horimetro").insert({
-                  maquina_id: maq.id,
-                  maquina_tag: maq.tag,
-                  horimetro: novoH,
-                  responsavel: usuarioLogado?.nome || "Responsável",
-                  origem: "painel_rapido"
-                });
-
-                setMaquinas(prev => prev.map(m => m.id === maq.id ? { ...m, horimetro: novoH } : m));
-                setModalLeituraRapidaAberto(false);
-                alert("Horímetro do equipamento " + maq.tag + " atualizado para " + novoH.toLocaleString("pt-BR") + " h com sucesso!");
-              } catch (err) {
-                alert("Erro ao gravar leitura de horímetro.");
-              } finally {
-                setSalvando(false);
-              }
-            }}>
-              <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#334155", marginBottom: "6px" }}>
-                  Equipamento *
-                </label>
-                <select
-                  value={maquinaLeituraRapidaId}
-                  onChange={(e) => {
-                    const idEscolhido = e.target.value;
-                    setMaquinaLeituraRapidaId(idEscolhido);
-                    const maqSel = maquinas.find(x => x.id.toString() === idEscolhido);
-                    setValorNovoHorimetro(maqSel ? String(maqSel.horimetro || "") : "");
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    borderRadius: "8px",
-                    border: "1px solid #cbd5e1",
-                    fontSize: "14px",
-                    color: "#0f172a",
-                    background: "#ffffff"
-                  }}
-                  required
-                >
-                  <option value="">Selecione o equipamento...</option>
-                  {[...maquinas]
-                    .sort((a, b) => a.tag.localeCompare(b.tag))
-                    .map(m => (
-                      <option key={m.id} value={m.id}>
-                        {m.tag} — {m.modelo || m.marca || "Equipamento"} (Atual: {Number(m.horimetro || 0).toLocaleString("pt-BR")} h)
-                      </option>
-                    ))}
-                </select>
-              </div>
-
-              {maquinaLeituraRapidaId && (() => {
-                const maqSel = maquinas.find(x => x.id.toString() === maquinaLeituraRapidaId);
-                return (
-                  <div style={{ background: "#f8fafc", padding: "10px 14px", borderRadius: "8px", border: "1px solid #e2e8f0", marginBottom: "16px" }}>
-                    <div style={{ fontSize: "12px", color: "#64748b" }}>Último registro confirmado:</div>
-                    <div style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a" }}>
-                      {Number(maqSel?.horimetro || 0).toLocaleString("pt-BR")} horas
-                    </div>
-                  </div>
-                );
-              })()}
-
-              <div style={{ marginBottom: "24px" }}>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#334155", marginBottom: "6px" }}>
-                  Novo Horímetro Acumulado (Horas) *
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  value={valorNovoHorimetro}
-                  onChange={(e) => setValorNovoHorimetro(e.target.value)}
-                  placeholder="Ex: 2950"
-                  disabled={!maquinaLeituraRapidaId}
-                  style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    borderRadius: "8px",
-                    border: maquinaLeituraRapidaId ? "2px solid #ea580c" : "1px solid #cbd5e1",
-                    fontSize: "16px",
-                    fontWeight: 700,
-                    color: "#0f172a",
-                    background: maquinaLeituraRapidaId ? "#ffffff" : "#f1f5f9"
-                  }}
-                  required
-                />
-              </div>
-
-              <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
-                <button
-                  type="button"
-                  onClick={() => setModalLeituraRapidaAberto(false)}
-                  style={{
-                    padding: "9px 16px",
-                    borderRadius: "8px",
-                    border: "1px solid #cbd5e1",
-                    background: "#ffffff",
-                    color: "#64748b",
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    cursor: "pointer"
-                  }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={salvando || !maquinaLeituraRapidaId}
-                  style={{
-                    padding: "9px 20px",
-                    borderRadius: "8px",
-                    border: "none",
-                    background: !maquinaLeituraRapidaId ? "#94a3b8" : "#ea580c",
-                    color: "#ffffff",
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    cursor: !maquinaLeituraRapidaId ? "not-allowed" : "pointer",
-                    boxShadow: !maquinaLeituraRapidaId ? "none" : "0 2px 4px rgba(234, 88, 12, 0.3)"
-                  }}
-                >
-                  {salvando ? "Salvando..." : "Confirmar Leitura"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-    );
+        );
 }
 
 function Topo(props: {
