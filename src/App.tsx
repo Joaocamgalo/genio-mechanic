@@ -253,6 +253,9 @@ export default function App() {
   const [maquinaRequisicao, setMaquinaRequisicao] = useState<Maquina | null>(null);
   const [maquinaDesmobilizar, setMaquinaDesmobilizar] = useState<Maquina | null>(null);
   const [modalAuditoriaAberto, setModalAuditoriaAberto] = useState(false);
+  const [modalLeituraRapidaAberto, setModalLeituraRapidaAberto] = useState(false);
+  const [maquinaLeituraRapidaId, setMaquinaLeituraRapidaId] = useState("");
+  const [valorNovoHorimetro, setValorNovoHorimetro] = useState("");
   const [chamadoConcluirAssistido, setChamadoConcluirAssistido] = useState<Chamado | null>(null);
   
   useEffect(() => {
@@ -1607,9 +1610,9 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => {
-                    const maq = maquinas[0];
-                    if (maq) alterarHorimetroManual(maq);
-                    else alert("Nenhum equipamento cadastrado.");
+                    setMaquinaLeituraRapidaId("");
+                    setValorNovoHorimetro("");
+                    setModalLeituraRapidaAberto(true);
                   }}
                   style={{
                     background: "#ffffff",
