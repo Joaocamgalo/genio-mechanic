@@ -2349,188 +2349,294 @@ export default function App() {
               {maquinasFiltradas.map((maquina) => {
                 const situacao = calcularSituacaoMaquina(maquina.tag, chamados);
                 return (
-                  <div key={maquina.id} className="cm-card" style={estilos.cardMaquinaNovo}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <strong>{maquina.tag}</strong>
-                      <span className={`cm-badge badge-op-${situacao.toLowerCase().replace(' ', '-')}`}>{situacao}</span>
-                    </div>
-                    <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '10px' }}>
-                      {maquina.marca} • {maquina.modelo}
+                  <div
+                    key={maquina.id}
+                    style={{
+                      background: "#ffffff",
+                      borderRadius: "14px",
+                      border: "1px solid #e2e8f0",
+                      padding: "16px",
+                      boxShadow: "0 1px 3px rgba(15, 23, 42, 0.05)",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                      gap: "12px",
+                      transition: "all 0.2s ease"
+                    }}
+                  >
+                    {/* CABECALHO: TAG, MODELO E STATUS */}
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "4px" }}>
+                        <div>
+                          <h4 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.3px" }}>
+                            {maquina.tag}
+                          </h4>
+                          <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 600 }}>
+                            {maquina.marca} • {maquina.modelo}
+                          </span>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            padding: "4px 9px",
+                            borderRadius: "99px",
+                            background: situacao.toLowerCase().includes("manut") ? "#fee2e2" : "#ecfdf5",
+                            color: situacao.toLowerCase().includes("manut") ? "#b91c1c" : "#047857",
+                            border: situacao.toLowerCase().includes("manut") ? "1px solid #fca5a5" : "1px solid #a7f3d0"
+                          }}
+                        >
+                          {situacao}
+                        </span>
+                      </div>
                     </div>
 
-                    
-                    {/* Bloco Preditivo de Horímetro & Preventiva Inteligente */}
+                    {/* BLOCO PREDITIVO E HORIMETRO (NEUTRO CORPORATIVO) */}
                     {(() => {
                       const hAtual = Number(maquina.horimetro ?? 0);
                       const ciclo = 250;
                       const proximaRevisao = Math.ceil((hAtual + 1) / ciclo) * ciclo;
                       const horasRestantes = Math.max(0, proximaRevisao - hAtual);
                       const progressoCiclo = Math.min(100, Math.max(0, Math.round(((ciclo - horasRestantes) / ciclo) * 100)));
-                      
-                      // Estimativa preditiva baseada em turno padrão de 8h/dia
+
                       const diasEstimados = Math.max(0, Math.round(horasRestantes / 8));
                       const dataEstimada = new Date();
                       dataEstimada.setDate(dataEstimada.getDate() + diasEstimados);
                       const dataFormatada = dataEstimada.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 
-                      // Regras claras e todas as variáveis declaradas:
                       const isCritico = horasRestantes <= 10;
                       const isAtencao = horasRestantes <= 35 && !isCritico;
-                      const isAlertaFiltros = diasEstimados <= 45 && !isCritico;
 
                       return (
-                        <div style={{
-                          background: isCritico ? "#fff1f2" : isAtencao ? "#fffbeb" : isAlertaFiltros ? "#fefce8" : "#f8fafc",
-                          border: isCritico ? "1px solid #fecdd3" : isAtencao ? "1px solid #fde68a" : isAlertaFiltros ? "1px solid #fde047" : "1px solid #e2e8f0",
-                          borderRadius: "10px",
-                          padding: "10px 12px",
-                          marginBottom: "12px",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "8px"
-                        }}>
+                        <div
+                          style={{
+                            background: "#f8fafc",
+                            border: "1px solid #e2e8f0",
+                            borderRadius: "10px",
+                            padding: "12px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "10px"
+                          }}
+                        >
+                          {/* Horimetro e Ajuste Rapido */}
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                             <div>
-                              <div style={{ fontSize: "10px", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Horímetro Atual</div>
-                              <div style={{ fontSize: "18px", fontWeight: 900, color: "#0f172a", letterSpacing: "-0.5px" }}>
-                                {hAtual} <span style={{ fontSize: "12px", fontWeight: 600, color: "#64748b" }}>h</span>
+                              <span style={{ fontSize: "10px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                                Horímetro Atual
+                              </span>
+                              <div style={{ fontSize: "20px", fontWeight: 900, color: "#0f172a" }}>
+                                {hAtual.toLocaleString("pt-BR")} <span style={{ fontSize: "12px", fontWeight: 600, color: "#64748b" }}>h</span>
                               </div>
                             </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                              {isAlertaFiltros && (
-                                <span style={{
-                                  background: "#fef08a",
-                                  border: "1px solid #eab308",
-                                  color: "#854d0e",
-                                  fontSize: "9px",
-                                  fontWeight: 800,
-                                  padding: "3px 6px",
-                                  borderRadius: "4px",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.4px"
-                                }}>
-                                  📦 Pedir Filtros
-                                </span>
-                              )}
-                              <button onClick={() => alterarHorimetroManual(maquina)} style={{ ...estilos.botaoAjustarHorimetro, borderRadius: "6px" }}>
-                                Ajustar
-                              </button>
-                            </div>
+                            <button
+                              type="button"
+                              onClick={() => alterarHorimetroManual(maquina)}
+                              style={{
+                                background: "#ffffff",
+                                border: "1px solid #cbd5e1",
+                                color: "#334155",
+                                padding: "5px 10px",
+                                borderRadius: "6px",
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                boxShadow: "0 1px 2px rgba(0,0,0,0.03)"
+                              }}
+                            >
+                              Ajustar
+                            </button>
                           </div>
 
-                          {/* Barra de Progresso do Ciclo Preventivo */}
+                          {/* Barra de Progresso da Preventiva */}
                           <div>
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "4px" }}>
-                              <span style={{ color: "#64748b", fontWeight: 600 }}>Próxima ({proximaRevisao}h):</span>
-                              <strong style={{ color: isCritico ? "#e11d48" : isAtencao ? "#d97706" : isAlertaFiltros ? "#ca8a04" : "#0284c7" }}>
-                                {horasRestantes === 0 ? "VENCIDA HOJE" : horasRestantes + "h restantes"}
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "5px" }}>
+                              <span style={{ color: "#64748b", fontWeight: 600 }}>Próxima ({proximaRevisao}h)</span>
+                              <strong style={{ color: isCritico ? "#dc2626" : isAtencao ? "#d97706" : "#2563eb" }}>
+                                {horasRestantes === 0 ? "Vencida" : `${horasRestantes}h restantes`}
                               </strong>
                             </div>
                             <div style={{ width: "100%", height: "6px", background: "#e2e8f0", borderRadius: "99px", overflow: "hidden" }}>
-                              <div style={{
-                                width: progressoCiclo + "%",
-                                height: "100%",
-                                background: isCritico ? "#e11d48" : isAtencao ? "#f59e0b" : isAlertaFiltros ? "#eab308" : "#0284c7",
-                                borderRadius: "99px",
-                                transition: "width 0.3s ease"
-                              }} />
+                              <div
+                                style={{
+                                  width: `${progressoCiclo}%`,
+                                  height: "100%",
+                                  background: isCritico ? "#dc2626" : isAtencao ? "#f59e0b" : "#2563eb",
+                                  borderRadius: "99px",
+                                  transition: "width 0.3s ease"
+                                }}
+                              />
                             </div>
                           </div>
 
-                          {/* Previsão Preditiva em Dias */}
-                          <div style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            fontSize: "10.5px",
-                            paddingTop: "4px",
-                            borderTop: "1px dashed rgba(0,0,0,0.06)"
-                          }}>
-                            <span style={{ color: "#64748b" }}>Previsão (~8h/dia):</span>
-                            <span style={{
-                              fontWeight: 700,
-                              color: isCritico ? "#be123c" : isAtencao ? "#b45309" : isAlertaFiltros ? "#854d0e" : "#334155"
-                            }}>
-                              {horasRestantes === 0 
-                                ? "🚨 Revisão Vencida" 
-                                : isAlertaFiltros 
-                                ? "~ " + diasEstimados + " dias (" + dataFormatada + ") · Pedir Filtros" 
-                                : "~ " + diasEstimados + " dias (" + dataFormatada + ")"}
-                            </span>
+                          {/* Previsao em Dias */}
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11px", color: "#64748b", paddingTop: "4px", borderTop: "1px dashed #e2e8f0" }}>
+                            <span>Previsão (~8h/dia):</span>
+                            <strong style={{ color: isCritico ? "#b91c1c" : isAtencao ? "#b45309" : "#334155" }}>
+                              ~{diasEstimados} dias ({dataFormatada})
+                            </strong>
                           </div>
                         </div>
                       );
                     })()}
 
-
-                    <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? '1.2fr 1fr' : '1fr', gap: '6px', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
+                    {/* ACOES OPERACIONAIS */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                       {isAdmin && (
                         <button
+                          type="button"
                           onClick={() => {
                             setMaquinaNovoChamado(maquina.tag);
-                            setTela('novoChamado');
+                            setTela("novoChamado");
                           }}
-                          style={estilos.botaoCardPrincipal}
+                          style={{
+                            width: "100%",
+                            padding: "9px 12px",
+                            background: "#ea580c",
+                            color: "#ffffff",
+                            border: "none",
+                            borderRadius: "8px",
+                            fontSize: "12px",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            boxShadow: "0 1px 3px rgba(234, 88, 12, 0.25)"
+                          }}
                         >
                           + Abrir OS
                         </button>
                       )}
-                      <button onClick={() => setMaquinaDossie(maquina)} style={estilos.botaoHistorico}>
-                        📋 Dossiê
-                      </button>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+                        <button
+                          type="button"
+                          onClick={() => setMaquinaDossie(maquina)}
+                          style={{
+                            padding: "8px",
+                            background: "#ffffff",
+                            border: "1px solid #cbd5e1",
+                            borderRadius: "6px",
+                            color: "#334155",
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "4px"
+                          }}
+                        >
+                          📋 Dossiê
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMaquinaFichaTecnica(maquina)}
+                          style={{
+                            padding: "8px",
+                            background: "#ffffff",
+                            border: "1px solid #cbd5e1",
+                            borderRadius: "6px",
+                            color: "#334155",
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "4px"
+                          }}
+                        >
+                          ⚙ Peças
+                        </button>
+                      </div>
+
                       <button
-                        onClick={() => setMaquinaFichaTecnica(maquina)}
-                        style={{
-                          ...estilos.botaoHistorico,
-                          background: "#0f172a",
-                          color: "#f59e0b",
-                          border: "1px solid #334155",
-                          fontWeight: 800
-                        }}
-                      >
-                        ⚙ Peças & Filtros
-                      </button>
-                      <button
+                        type="button"
                         onClick={() => setMaquinaRequisicao(maquina)}
                         style={{
-                          ...estilos.botaoHistorico,
-                          background: "#1e3a8a",
-                          color: "#93c5fd",
-                          border: "1px solid #3b82f6",
-                          fontWeight: 800
+                          width: "100%",
+                          padding: "7px 10px",
+                          background: "#f8fafc",
+                          border: "1px solid #e2e8f0",
+                          borderRadius: "6px",
+                          color: "#1e40af",
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "4px"
                         }}
                       >
                         📦 Pedido / Lead Time
                       </button>
-                      {isAdmin && (
+                    </div>
+
+                    {/* RODAPE ADMINISTRATIVO */}
+                    {isAdmin && (
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          paddingTop: "8px",
+                          borderTop: "1px solid #f1f5f9"
+                        }}
+                      >
                         <button
+                          type="button"
                           onClick={() => setMaquinaDesmobilizar(maquina)}
                           style={{
-                            ...estilos.botaoHistorico,
-                            background: "#7c2d12",
-                            color: "#fdba74",
-                            border: "1px solid #ea580c",
-                            fontWeight: 800
+                            background: "transparent",
+                            border: "none",
+                            color: "#c2410c",
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            padding: "2px 4px"
                           }}
                         >
                           🚚 Desmobilizar
                         </button>
-                      )}
-                    </div>
-
-                    {isAdmin && (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '6px' }}>
-                        <button onClick={() => { setMaquinaEmEdicao(maquina); setModalNovaMaquina(true); }} style={estilos.botaoAjustarHorimetro}>
-                          Editar
-                        </button>
-                        <button onClick={() => excluirMaquina(maquina)} style={estilos.botaoExcluirOS}>
-                          Excluir
-                        </button>
+                        <div style={{ display: "flex", gap: "10px" }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMaquinaEmEdicao(maquina);
+                              setModalNovaMaquina(true);
+                            }}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              color: "#64748b",
+                              fontSize: "11px",
+                              fontWeight: 700,
+                              cursor: "pointer"
+                            }}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => excluirMaquina(maquina)}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              color: "#ef4444",
+                              fontSize: "11px",
+                              fontWeight: 700,
+                              cursor: "pointer"
+                            }}
+                          >
+                            Excluir
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
                 );
               })}
+
             </div>
           </div>
         )}
